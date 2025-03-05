@@ -10,3 +10,4 @@ debug = true
 
 [profile.release-with-debug.package."*"]
 debug = false
+panic = "abort"

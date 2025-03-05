@@ -11,3 +11,6 @@ log = "0.4"
 [features]
 boot = ["uefi/alloc", "uefi/logger", "uefi/panic_handler", "uefi/global_allocator"]
 default = ["boot"]
+
+[profile.release]
+panic = "abort"
