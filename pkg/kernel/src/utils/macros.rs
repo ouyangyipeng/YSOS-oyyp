@@ -1,11 +1,12 @@
 use crate::drivers::serial::get_serial;
 use core::fmt::*;
 use x86_64::instructions::interrupts;
+use crate::drivers::serial::SERIAL;
 
 /// Use spin mutex to control variable access
 #[macro_export]
 macro_rules! guard_access_fn {
-    ($(#[$meta:meta])* $v:vis $fn:ident ($mutex:path : $ty:ty)) => {
+    ($(#[$meta:meta])* $v:vis $fn:ident ($mutex:path:$ty:ty)) => {
         paste::item! {
 
             $(#[$meta])*

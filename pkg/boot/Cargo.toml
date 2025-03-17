@@ -7,7 +7,7 @@ edition.workspace = true
 [dependencies]
 arrayvec = { workspace = true }
 uefi = { workspace = true }
-log = { workspace = true }
+log.workspace = true
 x86_64 = { workspace = true }
 xmas-elf = { workspace = true }
 elf = { workspace = true }
