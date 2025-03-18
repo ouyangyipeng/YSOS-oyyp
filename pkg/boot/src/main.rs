@@ -43,6 +43,7 @@ fn efi_main() -> Status {
             Err(e) => panic!("Failed to load ELF file: {:?}", e),
         }
     };
+    trace!("ELF file loaded");
 
     unsafe {
         set_entry(elf.header.pt2.entry_point() as usize);
@@ -57,6 +58,7 @@ fn efi_main() -> Status {
         .max()
         .unwrap()
         .max(0x1_0000_0000); // include IOAPIC MMIO area
+    trace!("Max physical address: {:#x}", max_phys_addr);
 
     // 4. Map ELF segments, kernel stack and physical memory to virtual memory
     let mut page_table = current_page_table();
@@ -65,10 +67,12 @@ fn efi_main() -> Status {
     unsafe{
         Cr0::update(|f| f.remove(Cr0Flags::WRITE_PROTECT));
     }
+    info!("Write protect disabled");
 
     // FIXME: map physical memory to specific virtual address offset
     let mut frame_allocator = UEFIFrameAllocator;
     map_physical_memory(config.physical_memory_offset, max_phys_addr, &mut page_table, &mut frame_allocator);
+    info!("Physical memory mapped to virtual memory");
 
     // FIXME: load and map the kernel elf file
     match load_elf(&elf, config.physical_memory_offset, &mut page_table, &mut frame_allocator){
@@ -87,8 +91,10 @@ fn efi_main() -> Status {
     unsafe {
         Cr0::update(|f| f.insert(Cr0Flags::WRITE_PROTECT));
     }
+    info!("Write protect enabled");
 
     free_elf(elf);
+    info!("ELF file freed");
 
     // 5. Pass system table to kernel
     let ptr = uefi::table::system_table_raw().expect("Failed to get system table");
@@ -110,6 +116,8 @@ fn efi_main() -> Status {
 
     // align stack to 8 bytes
     let stacktop = config.kernel_stack_address + config.kernel_stack_size * 0x1000 - 8;
+
+    info!("Bootloader started");
 
     jump_to_entry(&bootinfo, stacktop);
 }

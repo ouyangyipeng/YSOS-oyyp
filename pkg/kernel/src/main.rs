@@ -11,7 +11,7 @@ boot::entry_point!(kernel_main);
 
 pub fn kernel_main(boot_info: &'static boot::BootInfo) -> ! {
     ysos::init(boot_info);
-
+    info!("Kernel initialized.");
     loop {
         info!("Hello World from YatSenOS v2!");
 
