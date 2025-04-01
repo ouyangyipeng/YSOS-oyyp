@@ -52,6 +52,9 @@ impl SerialPort {
 
             // 设置正常操作模式（禁用回环，启用中断）
             PortWriteOnly::new(base + 4).write(0x0F as u8);
+
+            // 启用数据接收中断（IER 的 bit 0）
+            PortWriteOnly::new(base + 1).write(0x01 as u8);
         }
     }
 
