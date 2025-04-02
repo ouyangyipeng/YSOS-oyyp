@@ -1,0 +1,10 @@
+快速复制
+
+编译内核命令
+python ysos.py build -p debug
+
+运行debug脚本命令
+/work/OYOS/debug_script.sh
+
+杀死脚本tmux进程命令
+tmux kill-session -t oyos-debug
