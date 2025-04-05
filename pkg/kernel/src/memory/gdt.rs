@@ -11,10 +11,11 @@ pub const PAGE_FAULT_IST_INDEX: u16 = 1;    // 页故障栈索引:栈1用于页�
 // 还要处理ssf，gpf，mc等异常
 pub const STACK_SEGMENT_IST_INDEX: u16 = 2; // 栈段故障栈索引：栈2用于栈段故障
 pub const GPF_IST_INDEX: u16 = 3;          // 一般保护故障栈索引：栈3用于一般保护故障
-pub const MACHINE_CHECK_IST_INDEX: u16 = 4; // 机器检查栈索引：栈4用于机器检查异常
+pub const MACHINE_CHECK_IST_INDEX: u16 = 4; // 机器检查栈索引：栈4用于机器检查异常（这个不一定要）
 // pub const NMI_IST_INDEX: u16 = 5;         // 非屏蔽中断栈索引：栈5用于非屏蔽中断
+pub const TIMER_IST_INDEX: u16 = 6;       // 定时器栈索引：栈6用于定时器中断
 
-pub const IST_SIZES: [usize; 7] = [0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000]; // 每个IST栈大小(4KB)
+pub const IST_SIZES: [usize; 8] = [0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000]; // 每个IST栈大小(4KB)
 
 // ! 核心组件
 lazy_static! {// 延迟初始化复杂全局变量，避免编译期计算(上网查的这个宏)
@@ -99,7 +100,7 @@ lazy_static! {// 延迟初始化复杂全局变量，避免编译期计算(上�
             stack_end
         };
 
-        // 中断5号栈machine check
+        // 中断5号栈machine check（可被换走，如果后面实验还有别的要？）
         tss.interrupt_stack_table[MACHINE_CHECK_IST_INDEX as usize] = {
             const STACK_SIZE: usize = IST_SIZES[5];
             static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
@@ -126,6 +127,20 @@ lazy_static! {// 延迟初始化复杂全局变量，避免编译期计算(上�
         //     );
         //     stack_end
         // };
+
+        // 中断7号栈timer
+        tss.interrupt_stack_table[TIMER_IST_INDEX as usize] = {
+            const STACK_SIZE: usize = IST_SIZES[6];
+            static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+            let stack_start = VirtAddr::from_ptr(addr_of_mut!(STACK));
+            let stack_end = stack_start + STACK_SIZE as u64;
+            info!(
+                "Interrupt(Timer) Stack  : 0x{:016x}-0x{:016x}",
+                stack_start.as_u64(),
+                stack_end.as_u64()
+            );
+            stack_end
+        };
 
         tss
     };
