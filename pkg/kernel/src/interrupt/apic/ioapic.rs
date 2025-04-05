@@ -1,4 +1,5 @@
 /// The I/O APIC manages hardware interrupts for an SMP system.
+/// I/O APIC驱动，SMP对称多处理系统中管理硬件中断的一个核心
 ///
 /// [Intel Doc](http://www.intel.com/design/chipsets/datashts/29056601.pdf)
 use bit_field::BitField;

@@ -9,7 +9,7 @@ use x86_64::structures::idt::InterruptDescriptorTable;
 use crate::memory::physical_to_virtual;
 
 lazy_static! {
-    static ref IDT: InterruptDescriptorTable = {
+    static ref IDT: InterruptDescriptorTable = {// 根据phil网站，这里必须是static，不然idt生命周期就不够长
         let mut idt = InterruptDescriptorTable::new();
         unsafe {
             exceptions::register_idt(&mut idt);

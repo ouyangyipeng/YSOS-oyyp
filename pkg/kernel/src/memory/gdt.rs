@@ -8,7 +8,13 @@ use x86_64::VirtAddr;
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;  // 双重故障栈索引:栈0用于双重故障（最严重的CPU异常）
 pub const PAGE_FAULT_IST_INDEX: u16 = 1;    // 页故障栈索引:栈1用于页故障（需处理缺页异常）
 
-pub const IST_SIZES: [usize; 3] = [0x1000, 0x1000, 0x1000]; // 每个IST栈大小(4KB)
+// 还要处理ssf，gpf，mc等异常
+pub const STACK_SEGMENT_IST_INDEX: u16 = 2; // 栈段故障栈索引：栈2用于栈段故障
+pub const GPF_IST_INDEX: u16 = 3;          // 一般保护故障栈索引：栈3用于一般保护故障
+pub const MACHINE_CHECK_IST_INDEX: u16 = 4; // 机器检查栈索引：栈4用于机器检查异常
+// pub const NMI_IST_INDEX: u16 = 5;         // 非屏蔽中断栈索引：栈5用于非屏蔽中断
+
+pub const IST_SIZES: [usize; 7] = [0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000]; // 每个IST栈大小(4KB)
 
 // ! 核心组件
 lazy_static! {// 延迟初始化复杂全局变量，避免编译期计算(上网查的这个宏)
@@ -37,7 +43,7 @@ lazy_static! {// 延迟初始化复杂全局变量，避免编译期计算(上�
         // FIXME: fill tss.interrupt_stack_table with the static stack buffers like above
         // You can use `tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize]`
 
-        // 特权级1的栈（内核模式）double fault
+        // 中断1号栈double fault
         tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize] = {
             const STACK_SIZE: usize = IST_SIZES[1];
             static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
@@ -51,7 +57,7 @@ lazy_static! {// 延迟初始化复杂全局变量，避免编译期计算(上�
             stack_end
         };
 
-        // 特权级2的栈（内核模式）page fault
+        // 中断2号栈page fault
         tss.interrupt_stack_table[PAGE_FAULT_IST_INDEX as usize] = {
             const STACK_SIZE: usize = IST_SIZES[2];
             static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
@@ -64,6 +70,62 @@ lazy_static! {// 延迟初始化复杂全局变量，避免编译期计算(上�
             );
             stack_end
         };
+
+        // 中断3号栈stack segment fault
+        tss.interrupt_stack_table[STACK_SEGMENT_IST_INDEX as usize] = {
+            const STACK_SIZE: usize = IST_SIZES[3];
+            static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+            let stack_start = VirtAddr::from_ptr(addr_of_mut!(STACK));
+            let stack_end = stack_start + STACK_SIZE as u64;
+            info!(
+                "Interrupt(Stack Segment Fault) Stack  : 0x{:016x}-0x{:016x}",
+                stack_start.as_u64(),
+                stack_end.as_u64()
+            );
+            stack_end
+        };
+
+        // 中断4号栈general protection fault
+        tss.interrupt_stack_table[GPF_IST_INDEX as usize] = {
+            const STACK_SIZE: usize = IST_SIZES[4];
+            static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+            let stack_start = VirtAddr::from_ptr(addr_of_mut!(STACK));
+            let stack_end = stack_start + STACK_SIZE as u64;
+            info!(
+                "Interrupt(General Protection Fault) Stack  : 0x{:016x}-0x{:016x}",
+                stack_start.as_u64(),
+                stack_end.as_u64()
+            );
+            stack_end
+        };
+
+        // 中断5号栈machine check
+        tss.interrupt_stack_table[MACHINE_CHECK_IST_INDEX as usize] = {
+            const STACK_SIZE: usize = IST_SIZES[5];
+            static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+            let stack_start = VirtAddr::from_ptr(addr_of_mut!(STACK));
+            let stack_end = stack_start + STACK_SIZE as u64;
+            info!(
+                "Interrupt(Machine Check) Stack  : 0x{:016x}-0x{:016x}",
+                stack_start.as_u64(),
+                stack_end.as_u64()
+            );
+            stack_end
+        };
+
+        // 中断6号栈nmi
+        // tss.interrupt_stack_table[5] = {
+        //     const STACK_SIZE: usize = IST_SIZES[6];
+        //     static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+        //     let stack_start = VirtAddr::from_ptr(addr_of_mut!(STACK));
+        //     let stack_end = stack_start + STACK_SIZE as u64;
+        //     info!(
+        //         "Interrupt(NMI) Stack  : 0x{:016x}-0x{:016x}",
+        //         stack_start.as_u64(),
+        //         stack_end.as_u64()
+        //     );
+        //     stack_end
+        // };
 
         tss
     };

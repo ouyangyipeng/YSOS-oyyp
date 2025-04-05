@@ -34,6 +34,19 @@ impl LocalApic for XApic {
     /// If this type APIC is supported
     fn support() -> bool {
         // FIXME: Check CPUID to see if xAPIC is supported.
+        // let cpuid = CpuId::new();
+        // // CPUID.01h:EDX.APIC[bit 9]
+        // let eax = cpuid.get_cpuid(0x1).unwrap();
+        // let edx = eax.edx();
+        // if edx.get_bit(9) {
+        //     true
+        // }else {
+        //     false
+        // }
+        CpuId::new()
+            .get_feature_info()
+            .map(|f| f.has_apic())
+            .unwrap_or(false)
     }
 
     /// Initialize the xAPIC for the current CPU.
