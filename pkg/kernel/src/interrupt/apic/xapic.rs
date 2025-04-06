@@ -73,6 +73,7 @@ pub struct XApic {
 
 impl XApic {
     pub unsafe fn new(addr: u64) -> Self {
+        // info!("XApic::new: addr = {:#x}", addr);
         XApic { addr }// 在这里映射更加安全吧？
         // let addr = physical_to_virtual(addr);
         // XApic { addr }

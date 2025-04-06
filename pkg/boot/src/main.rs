@@ -6,14 +6,18 @@
 extern crate log;
 extern crate alloc;
 
+use core::panic;
+
 use alloc::boxed::Box;
 use alloc::vec;
+use config::Config;
 use uefi::{entry, Status, mem::memory_map::MemoryMap};
 use x86_64::registers::control::*;
 use ysos_boot::*;
 use xmas_elf::ElfFile;
 use elf::*;
-
+use x86_64::registers::control::*;
+use x86_64::structures::paging::page::PageRange;
 mod config;
 
 const CONFIG_PATH: &str = "\\EFI\\BOOT\\boot.conf";
@@ -37,6 +41,7 @@ fn efi_main() -> Status {
     // 2. Load ELF files
     let elf = { /* FIXME: Load kernel elf file */ 
         let mut file = fs::open_file(config.kernel_path);
+        info!("Loading kernel ELF file: {}", config.kernel_path);
         let buf = fs::load_file(&mut file);
         match ElfFile::new(buf) {
             Ok(elf) => elf,
@@ -47,6 +52,7 @@ fn efi_main() -> Status {
 
     unsafe {
         set_entry(elf.header.pt2.entry_point() as usize);
+        info!("Kernel entry point: {:#x}", elf.header.pt2.entry_point());
     }
 
     // 3. Load MemoryMap
@@ -58,12 +64,12 @@ fn efi_main() -> Status {
         .max()
         .unwrap()
         .max(0x1_0000_0000); // include IOAPIC MMIO area
-    trace!("Max physical address: {:#x}", max_phys_addr);
+    info!("Max physical address: {:#x}", max_phys_addr);
 
     // 4. Map ELF segments, kernel stack and physical memory to virtual memory
     let mut page_table = current_page_table();
 
-    // FIXME: root page table is readonly, disable write protect (Cr0)
+    // FIXME: root page table is read only, disable write protect (Cr0)
     unsafe{
         Cr0::update(|f| f.remove(Cr0Flags::WRITE_PROTECT));
     }
@@ -73,6 +79,7 @@ fn efi_main() -> Status {
     let mut frame_allocator = UEFIFrameAllocator;
     map_physical_memory(config.physical_memory_offset, max_phys_addr, &mut page_table, &mut frame_allocator);
     info!("Physical memory mapped to virtual memory");
+    info!("Physical memory offset: {:#x}", config.physical_memory_offset);
 
     // FIXME: load and map the kernel elf file
     match load_elf(&elf, config.physical_memory_offset, &mut page_table, &mut frame_allocator){
@@ -81,9 +88,28 @@ fn efi_main() -> Status {
     }
 
     // FIXME: map kernel stack
-    let stacktop = config.kernel_stack_address + config.kernel_stack_size * 0x1000 - 8;
-    match map_range(stacktop, config.kernel_stack_size, &mut page_table, &mut frame_allocator){
-        Ok(_) => info!("Kernel stack mapped successfully"),
+    let (stack_start, stack_size) = if config.kernel_stack_auto_grow > 0 {
+        let stack_start = config.kernel_stack_address
+            + (config.kernel_stack_size - config.kernel_stack_auto_grow) * 0x1000;
+        (stack_start, config.kernel_stack_auto_grow)
+    } else {
+        (config.kernel_stack_address, config.kernel_stack_size)
+    };
+
+    info!(
+        "Kernel init stack: [0x{:x?} -> 0x{:x?}), size: {} pages",
+        stack_start,
+        stack_start + stack_size * 0x1000,
+        stack_size
+    );
+
+    match map_range(
+        stack_start,
+        stack_size,
+        &mut page_table,
+        &mut frame_allocator)
+    {
+        Ok(range) => info!("Kernel stack mapped: {:#x?}", range),
         Err(e) => panic!("Failed to map kernel stack: {:?}", e),
     }
 

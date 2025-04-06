@@ -93,7 +93,9 @@ pub fn load_elf(
     info!("Loading ELF file... @ {:#x}", file_buf as u64);
 
     for segment in elf.program_iter() {
+        info!("Loading segment: {:#x?}", segment);
         if segment.get_type().unwrap() != program::Type::Load {
+            info!("Skip segment: {:#x?}", segment);
             continue;
         }
 
@@ -131,20 +133,36 @@ fn load_segment(
     // FIXME: handle page table flags with segment flags
     // unimplemented!("Handle page table flags with segment flags!");
 
-    let flags = segment.flags();
+    // let flags = segment.flags();
 
-    // 写
-    if flags.is_write() {
-        page_table_flags |= PageTableFlags::WRITABLE;
-    }
-    trace!("Segment flags: {:?}", flags);
+    // // 写
+    // if flags.is_write() {
+    //     page_table_flags |= PageTableFlags::WRITABLE;
+    // }
+    // info!("Segment flags: {:?}", flags);
 
-    // 执行
-    if !flags.is_execute() {
-        page_table_flags |= PageTableFlags::NO_EXECUTE;
-    }
+    // // 执行
+    // if !flags.is_execute() {
+    //     page_table_flags |= PageTableFlags::NO_EXECUTE;
+    // }
 
-    trace!("Segment page table flag: {:?}", page_table_flags);
+    if segment.flags().is_execute() {
+        page_table_flags.remove(PageTableFlags::NO_EXECUTE);
+    } else {
+        page_table_flags.insert(PageTableFlags::NO_EXECUTE);
+    };
+    if segment.flags().is_write() {
+        page_table_flags.insert(PageTableFlags::WRITABLE);
+    } else {
+        page_table_flags.remove(PageTableFlags::WRITABLE);
+    };
+    if segment.flags().is_read() {
+        page_table_flags.insert(PageTableFlags::USER_ACCESSIBLE);
+    } else {
+        page_table_flags.remove(PageTableFlags::USER_ACCESSIBLE);
+    };
+
+    info!("Segment page table flag: {:?}", page_table_flags);
 
     let start_page = Page::containing_address(virt_start_addr);
     let end_page = Page::containing_address(virt_start_addr + file_size - 1u64);
