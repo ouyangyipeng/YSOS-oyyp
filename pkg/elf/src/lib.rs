@@ -90,12 +90,12 @@ pub fn load_elf(
 ) -> Result<(), MapToError<Size4KiB>> {
     let file_buf = elf.input.as_ptr();
 
-    info!("Loading ELF file... @ {:#x}", file_buf as u64);
+    trace!("Loading ELF file... @ {:#x}", file_buf as u64);
 
     for segment in elf.program_iter() {
-        info!("Loading segment: {:#x?}", segment);
+        trace!("Loading segment: {:#x?}", segment);
         if segment.get_type().unwrap() != program::Type::Load {
-            info!("Skip segment: {:#x?}", segment);
+            trace!("Skip segment: {:#x?}", segment);
             continue;
         }
 
@@ -162,7 +162,7 @@ fn load_segment(
         page_table_flags.remove(PageTableFlags::USER_ACCESSIBLE);
     };
 
-    info!("Segment page table flag: {:?}", page_table_flags);
+    trace!("Segment page table flag: {:?}", page_table_flags);
 
     let start_page = Page::containing_address(virt_start_addr);
     let end_page = Page::containing_address(virt_start_addr + file_size - 1u64);

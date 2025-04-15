@@ -36,12 +36,12 @@ fn efi_main() -> Status {
         config::Config::parse(buf)
     };
 
-    info!("Config: {:#x?}", config);
+    trace!("Config: {:#x?}", config);
 
     // 2. Load ELF files
     let elf = { /* FIXME: Load kernel elf file */ 
         let mut file = fs::open_file(config.kernel_path);
-        info!("Loading kernel ELF file: {}", config.kernel_path);
+        trace!("Loading kernel ELF file: {}", config.kernel_path);
         let buf = fs::load_file(&mut file);
         match ElfFile::new(buf) {
             Ok(elf) => elf,
@@ -52,7 +52,7 @@ fn efi_main() -> Status {
 
     unsafe {
         set_entry(elf.header.pt2.entry_point() as usize);
-        info!("Kernel entry point: {:#x}", elf.header.pt2.entry_point());
+        trace!("Kernel entry point: {:#x}", elf.header.pt2.entry_point());
     }
 
     // 3. Load MemoryMap
@@ -64,7 +64,7 @@ fn efi_main() -> Status {
         .max()
         .unwrap()
         .max(0x1_0000_0000); // include IOAPIC MMIO area
-    info!("Max physical address: {:#x}", max_phys_addr);
+    trace!("Max physical address: {:#x}", max_phys_addr);
 
     // 4. Map ELF segments, kernel stack and physical memory to virtual memory
     let mut page_table = current_page_table();
@@ -73,17 +73,17 @@ fn efi_main() -> Status {
     unsafe{
         Cr0::update(|f| f.remove(Cr0Flags::WRITE_PROTECT));
     }
-    info!("Write protect disabled");
+    trace!("Write protect disabled");
 
     // FIXME: map physical memory to specific virtual address offset
     let mut frame_allocator = UEFIFrameAllocator;
     map_physical_memory(config.physical_memory_offset, max_phys_addr, &mut page_table, &mut frame_allocator);
-    info!("Physical memory mapped to virtual memory");
-    info!("Physical memory offset: {:#x}", config.physical_memory_offset);
+    trace!("Physical memory mapped to virtual memory");
+    trace!("Physical memory offset: {:#x}", config.physical_memory_offset);
 
     // FIXME: load and map the kernel elf file
     match load_elf(&elf, config.physical_memory_offset, &mut page_table, &mut frame_allocator){
-        Ok(_) => info!("Kernel ELF loaded successfully"),
+        Ok(_) => trace!("Kernel ELF loaded successfully"),
         Err(e) => panic!("Failed to load ELF file: {:?}", e),
     }
 
@@ -96,7 +96,7 @@ fn efi_main() -> Status {
         (config.kernel_stack_address, config.kernel_stack_size)
     };
 
-    info!(
+    trace!(
         "Kernel init stack: [0x{:x?} -> 0x{:x?}), size: {} pages",
         stack_start,
         stack_start + stack_size * 0x1000,
@@ -109,7 +109,7 @@ fn efi_main() -> Status {
         &mut page_table,
         &mut frame_allocator)
     {
-        Ok(range) => info!("Kernel stack mapped: {:#x?}", range),
+        Ok(range) => trace!("Kernel stack mapped: {:#x?}", range),
         Err(e) => panic!("Failed to map kernel stack: {:?}", e),
     }
 
@@ -117,10 +117,10 @@ fn efi_main() -> Status {
     unsafe {
         Cr0::update(|f| f.insert(Cr0Flags::WRITE_PROTECT));
     }
-    info!("Write protect enabled");
+    trace!("Write protect enabled");
 
     free_elf(elf);
-    info!("ELF file freed");
+    trace!("ELF file freed");
 
     // 5. Pass system table to kernel
     let ptr = uefi::table::system_table_raw().expect("Failed to get system table");

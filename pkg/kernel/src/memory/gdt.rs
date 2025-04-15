@@ -9,8 +9,8 @@ pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;  // 双重故障栈索引:栈0用于�
 pub const PAGE_FAULT_IST_INDEX: u16 = 1;    // 页故障栈索引:栈1用于页故障（需处理缺页异常）
 
 // 还要处理ssf，gpf，mc等异常
-// pub const STACK_SEGMENT_IST_INDEX: u16 = 2; // 栈段故障栈索引：栈2用于栈段故障
-// pub const GPF_IST_INDEX: u16 = 3;          // 一般保护故障栈索引：栈3用于一般保护故障
+pub const STACK_SEGMENT_IST_INDEX: u16 = 2; // 栈段故障栈索引：栈2用于栈段故障
+pub const GPF_IST_INDEX: u16 = 3;          // 一般保护故障栈索引：栈3用于一般保护故障
 // pub const MACHINE_CHECK_IST_INDEX: u16 = 4; // 机器检查栈索引：栈4用于机器检查异常（这个不一定要）
 // pub const NMI_IST_INDEX: u16 = 5;         // 非屏蔽中断栈索引：栈5用于非屏蔽中断
 pub const TIMER_IST_INDEX: u16 = 2;       // 定时器栈索引：栈6用于定时器中断
@@ -20,7 +20,7 @@ pub const IST_SIZES: [usize; 8] = [0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x100
 // ! 核心组件
 lazy_static! {// 延迟初始化复杂全局变量，避免编译期计算(上网查的这个宏)
     static ref TSS: TaskStateSegment = {// 任务状态段
-        info!("Creating TSS...");
+        trace!("Creating TSS...");
         let mut tss = TaskStateSegment::new();
 
         // initialize the TSS with the static buffers
@@ -75,32 +75,32 @@ lazy_static! {// 延迟初始化复杂全局变量，避免编译期计算(上�
         };
 
         // 中断3号栈stack segment fault
-        // tss.interrupt_stack_table[STACK_SEGMENT_IST_INDEX as usize] = {
-        //     const STACK_SIZE: usize = IST_SIZES[3];
-        //     static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
-        //     let stack_start = VirtAddr::from_ptr(addr_of_mut!(STACK));
-        //     let stack_end = stack_start + STACK_SIZE as u64;
-        //     info!(
-        //         "Interrupt(Stack Segment Fault) Stack  : 0x{:016x}-0x{:016x}",
-        //         stack_start.as_u64(),
-        //         stack_end.as_u64()
-        //     );
-        //     stack_end
-        // };
+        tss.interrupt_stack_table[STACK_SEGMENT_IST_INDEX as usize] = {
+            const STACK_SIZE: usize = IST_SIZES[3];
+            static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+            let stack_start = VirtAddr::from_ptr(addr_of_mut!(STACK));
+            let stack_end = stack_start + STACK_SIZE as u64;
+            info!(
+                "Interrupt(Stack Segment Fault) Stack  : 0x{:016x}-0x{:016x}",
+                stack_start.as_u64(),
+                stack_end.as_u64()
+            );
+            stack_end
+        };
 
         // 中断4号栈general protection fault
-        // tss.interrupt_stack_table[GPF_IST_INDEX as usize] = {
-        //     const STACK_SIZE: usize = IST_SIZES[4];
-        //     static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
-        //     let stack_start = VirtAddr::from_ptr(addr_of_mut!(STACK));
-        //     let stack_end = stack_start + STACK_SIZE as u64;
-        //     info!(
-        //         "Interrupt(General Protection Fault) Stack  : 0x{:016x}-0x{:016x}",
-        //         stack_start.as_u64(),
-        //         stack_end.as_u64()
-        //     );
-        //     stack_end
-        // };
+        tss.interrupt_stack_table[GPF_IST_INDEX as usize] = {
+            const STACK_SIZE: usize = IST_SIZES[4];
+            static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+            let stack_start = VirtAddr::from_ptr(addr_of_mut!(STACK));
+            let stack_end = stack_start + STACK_SIZE as u64;
+            info!(
+                "Interrupt(General Protection Fault) Stack  : 0x{:016x}-0x{:016x}",
+                stack_start.as_u64(),
+                stack_end.as_u64()
+            );
+            stack_end
+        };
 
         // 中断5号栈machine check（可被换走，如果后面实验还有别的要？）
         // tss.interrupt_stack_table[MACHINE_CHECK_IST_INDEX as usize] = {
@@ -179,11 +179,11 @@ pub fn init() {
     use x86_64::instructions::tables::load_tss;
     use x86_64::PrivilegeLevel;
 
-    info!("Initializing GDT...");
+    trace!("Initializing GDT...");
 
     GDT.0.load();// 加载GDT到GDTR寄存器，lgdt指令，在实验报告有写，开始前预习了
-    info!("GDT Loaded.");
-    info!("Loading TSS...");
+    trace!("GDT Loaded.");
+    trace!("Loading TSS...");
     unsafe {
         // 设置段寄存器
         CS::set_reg(GDT.1.code_selector);// 设置代码段选择子
@@ -194,7 +194,7 @@ pub fn init() {
         GS::set_reg(SegmentSelector::new(0, PrivilegeLevel::Ring0));
         load_tss(GDT.1.tss_selector);// 加载TSS
     }
-    info!("TSS Loaded.");
+    trace!("TSS Loaded.");
 
     // 统计IST总大小
     let mut size = 0;
@@ -204,7 +204,7 @@ pub fn init() {
     }
 
     let (size, unit) = crate::humanized_size(size as u64);
-    info!("Kernel IST Size  : {:>7.*} {}", 3, size, unit);
+    trace!("Kernel IST Size  : {:>7.*} {}", 3, size, unit);
 
     info!("GDT Initialized.");
 }

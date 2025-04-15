@@ -51,7 +51,7 @@ pub fn get_line() -> String {
         
         match key {
             b'\n' | b'\r' => {
-                // println!("\n");
+                println!();
                 return line;
             }
             0x08 | 0x7F => {

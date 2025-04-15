@@ -20,27 +20,27 @@ pub unsafe fn register_idt(idt: &mut InterruptDescriptorTable) {
         // especially general protection fault (GPF)
         // see: https://wiki.osdev.org/Exceptions
 
-        // 需要独立栈的异常注册
+        // 可能需要独立栈的异常注册
         // 12
-        // idt.stack_segment_fault
-        //     .set_handler_fn(stack_segment_fault_handler)
-        //     .set_stack_index(gdt::STACK_SEGMENT_IST_INDEX);
+        idt.stack_segment_fault
+            .set_handler_fn(stack_segment_fault_handler)
+            .set_stack_index(gdt::STACK_SEGMENT_IST_INDEX);
         // idt.stack_segment_fault
         //     .set_handler_fn(stack_segment_fault_handler);
         
         // 13
-        // idt.general_protection_fault
-        //     .set_handler_fn(general_protection_fault_handler)
-        //     .set_stack_index(gdt::GPF_IST_INDEX);
         idt.general_protection_fault
-            .set_handler_fn(general_protection_fault_handler);
+            .set_handler_fn(general_protection_fault_handler)
+            .set_stack_index(gdt::GPF_IST_INDEX);
+        // idt.general_protection_fault
+        //     .set_handler_fn(general_protection_fault_handler);
         
         // 18
         // idt.machine_check
         //     .set_handler_fn(machine_check_handler)
         //     .set_stack_index(gdt::MACHINE_CHECK_IST_INDEX);
-        // idt.machine_check
-        //     .set_handler_fn(machine_check_handler);
+        idt.machine_check
+            .set_handler_fn(machine_check_handler);
         
         // 2
         // idt.non_maskable_interrupt
@@ -49,15 +49,15 @@ pub unsafe fn register_idt(idt: &mut InterruptDescriptorTable) {
 
         // 不需要独立栈的常见异常
         // 3
-        // idt.breakpoint.set_handler_fn(breakpoint_handler);
-        // // 6
-        // idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
-        // // 11
-        // idt.segment_not_present.set_handler_fn(segment_not_present_handler);
-        // // 10
-        // idt.invalid_tss.set_handler_fn(invalid_tss_handler);
-        // // 17
-        // idt.alignment_check.set_handler_fn(alignment_check_handler);
+        idt.breakpoint.set_handler_fn(breakpoint_handler);
+        // 6
+        idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
+        // 11
+        idt.segment_not_present.set_handler_fn(segment_not_present_handler);
+        // 10
+        idt.invalid_tss.set_handler_fn(invalid_tss_handler);
+        // 17
+        idt.alignment_check.set_handler_fn(alignment_check_handler);
         // 还剩下1、4、5、7、9、15、16、19、20、30
         // 7
         // idt.device_not_available.set_handler_fn(device_not_available_handler);
@@ -92,41 +92,41 @@ pub extern "x86-interrupt" fn double_fault_handler(
 }
 
 // 14
-// pub extern "x86-interrupt" fn page_fault_handler(
-//     stack_frame: InterruptStackFrame,
-//     err_code: PageFaultErrorCode,
-// ) {
-//     panic!(
-//         "EXCEPTION: PAGE FAULT, ERROR_CODE: {:?}\n\nTrying to access: {:#x}\n{:#?}",
-//         err_code,
-//         Cr2::read().unwrap_or(VirtAddr::new_truncate(0xdeadbeef)),
-//         stack_frame
-//     );
-// }
 pub extern "x86-interrupt" fn page_fault_handler(
     stack_frame: InterruptStackFrame,
     err_code: PageFaultErrorCode,
 ) {
     panic!(
-        "EXCEPTION: PAGE FAULT, ERROR_CODE: {:?}\n\nTrying to access:\n{:#?}",
+        "EXCEPTION: PAGE FAULT, ERROR_CODE: {:?}\n\nTrying to access: {:#x}\n{:#?}",
         err_code,
+        Cr2::read().unwrap_or(VirtAddr::new_truncate(0xdeadbeef)),
         stack_frame
     );
 }
+// pub extern "x86-interrupt" fn page_fault_handler(
+//     stack_frame: InterruptStackFrame,
+//     err_code: PageFaultErrorCode,
+// ) {
+//     panic!(
+//         "EXCEPTION: PAGE FAULT, ERROR_CODE: {:?}\n\nTrying to access:\n{:#?}",
+//         err_code,
+//         stack_frame
+//     );
+// }
 
 
 
 /* ----需要独立栈的处理函数---- */
-// // Stack Segment Fault (12)
-// pub extern "x86-interrupt" fn stack_segment_fault_handler(
-//     stack_frame: InterruptStackFrame,
-//     error_code: u64,
-// ) {
-//     panic!(
-//         "EXCEPTION: STACK SEGMENT FAULT, ERROR_CODE: 0x{:x}\n{:#?}",
-//         error_code, stack_frame
-//     );
-// }
+// Stack Segment Fault (12)
+pub extern "x86-interrupt" fn stack_segment_fault_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "EXCEPTION: STACK SEGMENT FAULT, ERROR_CODE: 0x{:x}\n{:#?}",
+        error_code, stack_frame
+    );
+}
 
 // General Protection Fault (13)
 pub extern "x86-interrupt" fn general_protection_fault_handler(
@@ -140,14 +140,14 @@ pub extern "x86-interrupt" fn general_protection_fault_handler(
 }
 
 // // Machine Check (18)
-// pub extern "x86-interrupt" fn machine_check_handler(
-//     stack_frame: InterruptStackFrame,
-// ) -> ! {
-//     panic!(
-//         "CRITICAL EXCEPTION: MACHINE CHECK\n{:#?}",
-//         stack_frame
-//     );
-// }
+pub extern "x86-interrupt" fn machine_check_handler(
+    stack_frame: InterruptStackFrame,
+) -> ! {
+    panic!(
+        "CRITICAL EXCEPTION: MACHINE CHECK\n{:#?}",
+        stack_frame
+    );
+}
 
 // nmi似乎不该在这里处理？
 /*
@@ -173,12 +173,12 @@ pub extern "x86-interrupt" fn nmi_handler(
 // }
 
 // Breakpoint (3)
-// pub extern "x86-interrupt" fn breakpoint_handler(
-//     stack_frame: InterruptStackFrame,
-// ) {
-//     println!("Debug breakpoint at {:#x}", stack_frame.instruction_pointer);
-//     // 调试用，可以继续执行，不用panic的
-// }
+pub extern "x86-interrupt" fn breakpoint_handler(
+    stack_frame: InterruptStackFrame,
+) {
+    println!("Debug breakpoint at {:#x}", stack_frame.instruction_pointer);
+    // 调试用，可以继续执行，不用panic的
+}
 
 // Overflow (4)
 // pub extern "x86-interrupt" fn overflow_handler(stack_frame: InterruptStackFrame) -> ! {
@@ -190,15 +190,15 @@ pub extern "x86-interrupt" fn nmi_handler(
 //     panic!("Bound Range Exceeded at {:#x}", stack_frame.instruction_pointer);
 // }
 
-// // Invalid Opcode (6)
-// pub extern "x86-interrupt" fn invalid_opcode_handler(
-//     stack_frame: InterruptStackFrame,
-// ) {
-//     panic!(
-//         "EXCEPTION: INVALID OPCODE\nInstruction Pointer: {:#x}\n{:#?}",
-//         stack_frame.instruction_pointer, stack_frame
-//     );
-// }
+// Invalid Opcode (6)
+pub extern "x86-interrupt" fn invalid_opcode_handler(
+    stack_frame: InterruptStackFrame,
+) {
+    panic!(
+        "EXCEPTION: INVALID OPCODE\nInstruction Pointer: {:#x}\n{:#?}",
+        stack_frame.instruction_pointer, stack_frame
+    );
+}
 
 // Device Not Available (7)
 // pub extern "x86-interrupt" fn device_not_available_handler(
@@ -210,27 +210,27 @@ pub extern "x86-interrupt" fn nmi_handler(
 // }
 
 
-// // Segment Not Present (11)
-// pub extern "x86-interrupt" fn segment_not_present_handler(
-//     stack_frame: InterruptStackFrame,
-//     error_code: u64,
-// ) {
-//     panic!(
-//         "EXCEPTION: SEGMENT NOT PRESENT, ERROR_CODE: 0x{:x}\n{:#?}",
-//         error_code, stack_frame
-//     );
-// }
+// Segment Not Present (11)
+pub extern "x86-interrupt" fn segment_not_present_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "EXCEPTION: SEGMENT NOT PRESENT, ERROR_CODE: 0x{:x}\n{:#?}",
+        error_code, stack_frame
+    );
+}
 
-// // Invalid TSS (10)
-// pub extern "x86-interrupt" fn invalid_tss_handler(
-//     stack_frame: InterruptStackFrame,
-//     error_code: u64,
-// ) {
-//     panic!(
-//         "EXCEPTION: INVALID TSS, ERROR_CODE: 0x{:x}\n{:#?}",
-//         error_code, stack_frame
-//     );
-// }
+// Invalid TSS (10)
+pub extern "x86-interrupt" fn invalid_tss_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "EXCEPTION: INVALID TSS, ERROR_CODE: 0x{:x}\n{:#?}",
+        error_code, stack_frame
+    );
+}
 
 // x87 Floating Point (16)
 // pub extern "x86-interrupt" fn x87_floating_point_handler(
@@ -242,15 +242,15 @@ pub extern "x86-interrupt" fn nmi_handler(
 // }
 
 // Alignment Check (17)
-// pub extern "x86-interrupt" fn alignment_check_handler(
-//     stack_frame: InterruptStackFrame,
-//     error_code: u64,
-// ) {
-//     panic!(
-//         "EXCEPTION: ALIGNMENT CHECK FAILED, ERROR_CODE: 0x{:x}\n{:#?}",
-//         error_code, stack_frame
-//     );
-// }
+pub extern "x86-interrupt" fn alignment_check_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "EXCEPTION: ALIGNMENT CHECK FAILED, ERROR_CODE: 0x{:x}\n{:#?}",
+        error_code, stack_frame
+    );
+}
 
 // // SIMD Floating Point (19)
 // pub extern "x86-interrupt" fn simd_floating_point_handler(

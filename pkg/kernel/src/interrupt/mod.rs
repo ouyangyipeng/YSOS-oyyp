@@ -10,28 +10,12 @@ use crate::memory::physical_to_virtual;
 
 use lazy_static::lazy_static;
 
-// static mut IDT: InterruptDescriptorTable= InterruptDescriptorTable::new();
-// pub fn init1(){// 根据phil网站，这里必须是static，不然idt生命周期就不够长
-//     info!("Creating IDT...");
-//     let mut idt = InterruptDescriptorTable::new();
-//     unsafe {
-//         info!("Registering IDT...");
-//         exceptions::register_idt(&mut idt);
-//         clock::register_idt(&mut idt);
-//         serial::register_idt(&mut idt);
-//     }
-//     unsafe {
-//         IDT = idt;
-//     }
-//     info!("IDT Created.");
-// }
-
 lazy_static! {
     static ref IDT: InterruptDescriptorTable = {// 根据phil网站，这里必须是static，不然idt生命周期就不够长
-        info!("Creating IDT...");
+        trace!("Creating IDT...");
         let mut idt = InterruptDescriptorTable::new();
         unsafe {
-            info!("Registering IDT...");
+            trace!("Registering IDT...");
             exceptions::register_idt(&mut idt);
             clock::register_idt(&mut idt);
             serial::register_idt(&mut idt);
@@ -44,20 +28,20 @@ lazy_static! {
 
 /// init interrupts system
 pub fn init() {
-    info!("Initializing Interrupts...");
+    trace!("Initializing Interrupts...");
     IDT.load();
 
 
-    info!("IDT Loaded.");
+    trace!("IDT Loaded.");
 
     // FIXME: check and init APIC
     match apic::XApic::support() {
         true => {
-            info!("xAPIC supported.");
+            trace!("xAPIC supported.");
             let mut lapic = unsafe { XApic::new(physical_to_virtual(LAPIC_ADDR)) };
-            info!("Starting xAPIC...");
+            trace!("Starting xAPIC...");
             lapic.cpu_init();
-            info!("xAPIC Initialized.");
+            trace!("xAPIC Initialized.");
         }
         false => {
             error!("xAPIC not supported.");
