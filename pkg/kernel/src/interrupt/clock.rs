@@ -1,7 +1,7 @@
-use crate::memory::*;
+use crate::{memory::*, proc::ProcessContext};
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
-use core::sync::atomic::{AtomicU64, Ordering};
+// use core::sync::atomic::{AtomicU64, Ordering};
 
 use super::consts::*;
 
@@ -12,47 +12,35 @@ pub unsafe fn register_idt(idt: &mut InterruptDescriptorTable) {
     trace!("Clock Interrupt Handler Registered.");
 }
 
-pub extern "x86-interrupt" fn clock_handler(_sf: InterruptStackFrame) {
+pub extern "x86-interrupt" fn clock (mut context: ProcessContext) {
     x86_64::instructions::interrupts::without_interrupts(|| {
-        if inc_counter() % 0x1000 == 0 {
-            trace!("Tick! @{}", read_counter());
-            // info!("Tick! @{}", read_counter());
-        }
+        crate::proc::switch(&mut context);
         super::ack();
     });
 }
+as_handler!(clock);
+        
 
-static COUNTER: AtomicU64 = AtomicU64::new(0);
+// pub extern "x86-interrupt" fn clock_handler(_sf: InterruptStackFrame) {
+//     x86_64::instructions::interrupts::without_interrupts(|| {
+//         if inc_counter() % 0x1000 == 0 {
+//             trace!("Tick! @{}", read_counter());
+//             // info!("Tick! @{}", read_counter());
+//         }
+//         super::ack();
+//     });
+// }
 
-#[inline]
-pub fn read_counter() -> u64 {
-    // FIXME: load counter value
-    COUNTER.load(Ordering::Relaxed)// 时间戳不需要严格顺序
-}
-
-#[inline]
-pub fn inc_counter() -> u64 {
-    // FIXME: read counter value and increase it
-    COUNTER.fetch_add(1, Ordering::SeqCst)// 必须使用SeqCst保证全局可见性
-}
-
-// 尝试不使用atomic，因为debug出问题了
-
-// static mut COUNTER: u64 = 0;
+// static COUNTER: AtomicU64 = AtomicU64::new(0);
 
 // #[inline]
 // pub fn read_counter() -> u64 {
 //     // FIXME: load counter value
-//     unsafe{
-//         COUNTER
-//     }
+//     COUNTER.load(Ordering::Relaxed)// 时间戳不需要严格顺序
 // }
 
 // #[inline]
 // pub fn inc_counter() -> u64 {
 //     // FIXME: read counter value and increase it
-//     unsafe{
-//         COUNTER += 1;
-//         COUNTER
-//     }
+//     COUNTER.fetch_add(1, Ordering::SeqCst)// 必须使用SeqCst保证全局可见性
 // }

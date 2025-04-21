@@ -1,8 +1,19 @@
 #[macro_use]
 mod macros;
+#[macro_use]
+mod regs;
 
+// pub mod clock;
+
+pub mod func;
 pub mod logger;
+
 pub use macros::*;
+pub use regs::*;
+
+use alloc::format;
+
+use crate::proc::*;
 
 pub const fn get_ascii_header() -> &'static str {
     concat!(
@@ -13,12 +24,61 @@ __  __      __  _____            ____  _____
  / / /_/ / /_ ___/ /  __/ / / / /_/ /___/ /
 /_/\__,_/\__//____/\___/_/ /_/\____//____/
 
+        OYYP 23336188
                                        v",
-        env!("CARGO_PKG_VERSION")   // 获取Cargo.toml中的版本号
+        env!("CARGO_PKG_VERSION")
     )
 }
 
-// ! 字节单位转换
+pub fn new_test_thread(id: &str) -> ProcessId {
+    let mut proc_data = ProcessData::new();
+    proc_data.set_env("id", id);
+
+    spawn_kernel_thread(
+        func::test,
+        format!("#{}_test", id),
+        Some(proc_data),
+    )
+}
+
+pub fn new_stack_test_thread() {
+    let pid = spawn_kernel_thread(
+        func::stack_test,
+        alloc::string::String::from("stack"),
+        None,
+    );
+
+    // wait for progress exit
+    wait(pid);
+}
+
+fn wait(pid: ProcessId) {
+    loop {
+        // FIXME: try to get the status of the process
+        let proc = manager::get_process_manager().get_proc(&pid);
+        if proc.is_none() {
+            warn!("Process #{} not found.", pid);
+            break;
+        }
+        let proc = proc.unwrap();
+        let proc = proc.read();
+
+        // HINT: it's better to use the exit code
+        let exit_code = proc.exit_code(); // Assuming exit_code() retrieves the exit code of the process
+
+        if exit_code.is_none() { // Assuming is_exited() is the method to check if the process has exited
+            x86_64::instructions::hlt();
+        } else {
+            info!(
+                "Process #{} exited with code: {}",
+                pid,
+                exit_code.unwrap()
+            );
+            break;
+        }
+    }
+}
+
 const SHORT_UNITS: [&str; 4] = ["B", "K", "M", "G"];
 const UNITS: [&str; 4] = ["B", "KiB", "MiB", "GiB"];
 

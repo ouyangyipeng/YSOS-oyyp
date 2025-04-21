@@ -213,3 +213,8 @@ pub fn init() {
 pub fn get_selector() -> &'static KernelSelectors {
     &GDT.1
 }
+
+// ! 用户态选择子获取接口
+// pub fn get_user_selector() -> SegmentSelector {
+//     SegmentSelector::new(0, PrivilegeLevel::Ring3)
+// }

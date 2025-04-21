@@ -26,6 +26,7 @@ pub mod drivers;
 pub use drivers::*;
 
 pub mod memory;
+pub mod proc;
 pub mod interrupt;
 
 pub use alloc::format;
@@ -47,6 +48,9 @@ pub fn init(boot_info: &'static BootInfo) {
     trace!("Debug: Kernel Heap Initialized.");
     interrupt::init(); // init interrupts
     memory::init(boot_info); // init memory manager
+
+    proc::init(); // init process manager
+    trace!("Debug: Process Manager Initialized.");
 
     x86_64::instructions::interrupts::enable();
     info!("Interrupts Enabled.");

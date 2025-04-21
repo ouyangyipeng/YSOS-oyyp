@@ -1,7 +1,7 @@
 快速复制
 
 编译内核命令
-python ysos.py build -p debug -i
+python ysos.py build -p debug
 /work/OYOS/debug_script.sh
 
 运行debug脚本命令

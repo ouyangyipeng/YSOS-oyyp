@@ -20,62 +20,90 @@ pub fn kernel_main(boot_info: &'static boot::BootInfo) -> ! {
     ysos::init(boot_info);
     info!("Kernel initialized.");
     info!("Hello World from YatSenOS v2!");
+
+    // FIXME: update lib.rs to pass following tests
+
+    // 1. run some (about 5) "test", show these threads are running concurrently
+
+    // 2. run "stack", create a huge stack, handle page fault properly
+
+    let mut test_num = 0;
+
     loop {
-        let counter = interrupt::clock::read_counter() / 10000;
-        
-        // print!("> ");
-        // print!(
-        //     "\x1b[34m░▒▓\
-        //     \x1b[44m\x1b[37m /work/OYOS\
-        //     \x1b[43m\x1b[30m main !5 \
-        //     \x1b[33m\
-        //     \x1b[30m\
-        //     \x1b[40m\x1b[31m ✔ │ root@Owen  \
-        //     \x1b[47m\x1b[30m{} 
-        //     \x1b[37m▓▒░\x1b[0m ",
-        //     format_time(counter)
-        // );
-        format_prompt(counter);
-        println!();
-        print!("╰─ ");
-        let input1 = input::get_line();
-
-        let input = input1.trim();
-        if input.is_empty() {
-            continue;
-        }
-
-        match input {
-            "exit" => {
-                println!("Exiting...");
-                break
-            },
-            "help" => {
-                println!("Available commands:");
-                println!("  exit - Exit the kernel");
-                println!("  help - Show this help message");
-                println!("  clock - Show the current clock counter value");
-                println!("  echo <message> - Print the message to the console");
+        print!("[>] ");
+        let line = input::get_line();
+        match line.trim() {
+            "exit" => break,
+            "ps" => {
+                ysos::proc::print_process_list();
             }
-            "clock" => {
-                println!("The current clock counter value is {}", interrupt::clock::read_counter());
+            "stack" => {
+                ysos::new_stack_test_thread();
             }
-            "echo" => {
-                println!("Usage: echo <message>");
-                println!("Prints the message to the console.");
+            "test" => {
+                ysos::new_test_thread(format!("{}", test_num).as_str());
+                test_num += 1;
             }
-            _ if input.starts_with("echo ") => {
-                let message = &input[5..];
-                println!("{}", message);
-            }
-            _ => {
-                // println!("You said: {}", input);
-                // println!("The counter value is {}", interrupt::clock::read_counter());
-                println!("Unknown command: {}", input);
-                println!("Type 'help' for a list of available commands.");
-            }
+            _ => println!("[=] {}", line),
         }
     }
+
+    // loop {
+    //     let counter = interrupt::clock::read_counter() / 10000;
+        
+    //     // print!("> ");
+    //     // print!(
+    //     //     "\x1b[34m░▒▓\
+    //     //     \x1b[44m\x1b[37m /work/OYOS\
+    //     //     \x1b[43m\x1b[30m main !5 \
+    //     //     \x1b[33m\
+    //     //     \x1b[30m\
+    //     //     \x1b[40m\x1b[31m ✔ │ root@Owen  \
+    //     //     \x1b[47m\x1b[30m{} 
+    //     //     \x1b[37m▓▒░\x1b[0m ",
+    //     //     format_time(counter)
+    //     // );
+    //     format_prompt(counter);
+    //     println!();
+    //     print!("╰─ ");
+    //     let input1 = input::get_line();
+
+    //     let input = input1.trim();
+    //     if input.is_empty() {
+    //         continue;
+    //     }
+
+    //     match input {
+    //         "exit" => {
+    //             println!("Exiting...");
+    //             break
+    //         },
+    //         "help" => {
+    //             println!("Available commands:");
+    //             println!("  exit - Exit the kernel");
+    //             println!("  help - Show this help message");
+    //             println!("  clock - Show the current clock counter value");
+    //             println!("  echo <message> - Print the message to the console");
+    //         }
+    //         "clock" => {
+    //             println!("The current clock counter value is {}", interrupt::clock::read_counter());
+    //         }
+    //         "echo" => {
+    //             println!("Usage: echo <message>");
+    //             println!("Prints the message to the console.");
+    //         }
+    //         _ if input.starts_with("echo ") => {
+    //             let message = &input[5..];
+    //             println!("{}", message);
+    //         }
+    //         _ => {
+    //             // println!("You said: {}", input);
+    //             // println!("The counter value is {}", interrupt::clock::read_counter());
+    //             println!("Unknown command: {}", input);
+    //             println!("Type 'help' for a list of available commands.");
+    //         }
+    //     }
+    // }
     ysos::shutdown();
 }
 
