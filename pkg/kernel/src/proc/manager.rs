@@ -76,28 +76,28 @@ impl ProcessManager {
             .expect("No current process")
     }
 
-    // pub fn save_current(&self, context: &ProcessContext) {
-    //     // FIXME: update current process's tick count
-    //     // FIXME: save current process's context
-    //     let cur_pid = processor::get_pid(); // 从处理器获取当前进程的pid
-    //     if let Some(cur_proc) = self.get_proc(&cur_pid) {
-    //         // info!("Process #{} found.", cur_pid);
-    //         let mut cur_inner= cur_proc.write();
-    //         // 更新运行时间
-    //         cur_inner.tick();
-    //         // info!("Process #{} ticks: {}", cur_pid, cur_inner.ticks_passed());
-    //         // 保存当前进程的上下文
-    //         cur_inner.save(context);
-    //         // drop(cur_inner);
-    //         // 更新当前进程的状态 → 这个部分在save里面实现了
-    //         // if cur_inner.status() == ProgramStatus::Running {
-    //         //     // cur_inner.set_status(ProgramStatus::Ready);
-    //         //     cur_inner.pause();
-    //         // }
-    //     } else {
-    //         warn!("Process #{} not found.", cur_pid);
-    //     }
-    // }
+    pub fn save_current(&self, context: &ProcessContext) {
+        // FIXME: update current process's tick count
+        // FIXME: save current process's context
+        let cur_pid = processor::get_pid(); // 从处理器获取当前进程的pid
+        if let Some(cur_proc) = self.get_proc(&cur_pid) {
+            // info!("Process #{} found.", cur_pid);
+            let mut cur_inner= cur_proc.write();
+            // 更新运行时间
+            cur_inner.tick();
+            // info!("Process #{} ticks: {}", cur_pid, cur_inner.ticks_passed());
+            // 保存当前进程的上下文
+            cur_inner.save(context);
+            // drop(cur_inner);
+            // 更新当前进程的状态 → 这个部分在save里面实现了
+            // if cur_inner.status() == ProgramStatus::Running {
+            //     // cur_inner.set_status(ProgramStatus::Ready);
+            //     cur_inner.pause();
+            // }
+        } else {
+            warn!("Process #{} not found.", cur_pid);
+        }
+    }
 
     pub fn switch_next(&self, context: &mut ProcessContext) -> ProcessId {
         let mut queue = self.ready_queue.lock();
@@ -144,66 +144,11 @@ impl ProcessManager {
 
         // FIXME: update processor's current pid
         processor::set_pid(next_pid);
-        processor::print_processors();
+        // processor::print_processors();
 
         // FIXME: return next process's pid
         next_pid
     }
-
-    pub fn save_current(&self, context: &ProcessContext) {
-        // FIXME: update current process's tick count
-        let   now_proc=self.current();
-        let mut now_proc_inner=now_proc.write();
-        now_proc_inner.tick();
-        // FIXME: save current process's context
-        now_proc_inner.save(context);
-
-    }
-
-   // filepath: /home/niuxh/YatSenOS-Tutorial-Volume-2/src/0x03/pkg/kernel/src/proc/manager.rs
-    // pub fn switch_next(&self, context: &mut ProcessContext) -> ProcessId {
-    //     // 获取就绪队列并找到下一个可运行的进程
-    //     let mut next_pid = {
-    //         let mut queue = self.ready_queue.lock();
-            
-    //         // 从队列中查找合适的进程
-    //         let mut selected_pid = None;
-            
-    //         // 最多检查队列中所有进程
-    //         let queue_len = queue.len();
-    //         for _ in 0..queue_len {
-    //             if let Some(pid) = queue.pop_front() {
-    //                 // 检查进程状态是否有效
-    //                 if let Some(proc) = self.get_proc(&pid) {
-    //                     if proc.read().status() != ProgramStatus::Dead {
-    //                         // 找到合适的进程
-    //                         selected_pid = Some(pid);
-    //                         break;
-    //                     }
-    //                 }
-    //             } else {
-    //                 // 队列已空
-    //                 break;
-    //             }
-    //         }
-            
-    //         // 如果没有找到可运行进程，使用内核进程
-    //         selected_pid.unwrap_or(KERNEL_PID)
-    //     }; // 队列锁在这里被释放
-
-    //     // 恢复选中进程的上下文
-    //     let next_proc = self.get_proc(&next_pid).unwrap();
-    //     {
-    //         let mut next_proc_inner = next_proc.write();
-    //         next_proc_inner.restore(context);
-    //     } // 写锁在这里被释放
-
-    //     // 更新处理器的当前PID
-    //     processor::set_pid(next_pid);
-        
-    //     // 返回下一个进程的PID
-    //     next_pid
-    // }
 
     pub fn spawn_kernel_thread(
         &self,
