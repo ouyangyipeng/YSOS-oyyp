@@ -102,6 +102,14 @@ impl ProcessInner {
         self.ticks_passed += 1;
     }
 
+    pub fn ticks_passed(&self) -> usize {
+        self.ticks_passed
+    }
+
+    pub fn set_status(&mut self, status: ProgramStatus) {
+        self.status = status;
+    }
+
     pub fn status(&self) -> ProgramStatus {
         self.status
     }
@@ -138,13 +146,20 @@ impl ProcessInner {
         self.vm_mut().handle_page_fault(addr)
     }
 
+    // init stack frame来自context.rs
+    pub fn init_stack_frame(&mut self, entry: VirtAddr, stack_top: VirtAddr) {
+        self.context.init_stack_frame(entry, stack_top);
+    }
+
     /// Save the process's context
     /// mark the process as ready
     pub(super) fn save(&mut self, context: &ProcessContext) {
         // FIXME: save the process's context
+        self.context.save(context);
         if self.status == ProgramStatus::Running {
-            self.context.save(context);
+            // self.context.save(context);
             self.pause();
+            // info!("Process {} is paused.", self.name);
         } else {
             warn!("Process {} is not running.", self.name);
         }
@@ -154,9 +169,11 @@ impl ProcessInner {
     /// mark the process as running
     pub(super) fn restore(&mut self, context: &mut ProcessContext) {
         // FIXME: restore the process's context
+        self.context.restore(context);
         if self.status == ProgramStatus::Ready {
-            self.context.restore(context);
-            self.vm_mut().page_table.load();
+            // self.context.restore(context);
+            // self.vm_mut().page_table.load();
+            self.vm().page_table.load();
             self.resume();
         } else {
             warn!("Process {} is not ready.", self.name);

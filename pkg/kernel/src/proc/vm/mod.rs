@@ -39,8 +39,28 @@ impl ProcessVm {
 
     pub fn init_proc_stack(&mut self, pid: ProcessId) -> VirtAddr {
         // FIXME: calculate the stack for pid
-        // FIXME: calculate the stack for pid
-        stack_top_addr
+        let stack_top_addr = STACK_INIT_TOP-((pid.0 as u64 -1) * PAGE_SIZE);
+        let stack_bot_addr = STACK_INIT_BOT-((pid.0 as u64 -1) * PAGE_SIZE);
+        let page_table = &mut self.page_table.mapper();
+        let alloc = &mut *get_frame_alloc_for_sure();
+        match elf::map_range(
+            stack_bot_addr,
+            STACK_DEF_PAGE,
+            page_table,
+            alloc,
+        ){
+            Ok(range) => {
+                info!("Stack range: {:#?}", range);
+            }
+            Err(e) => {
+                panic!("Failed to map stack: {:#?}", e);
+            }
+        }
+        self.stack = Stack::new(
+            Page::containing_address(VirtAddr::new(stack_top_addr)),
+            STACK_DEF_PAGE,
+        );
+        VirtAddr::new(stack_top_addr)
     }
 
     pub fn handle_page_fault(&mut self, addr: VirtAddr) -> bool {

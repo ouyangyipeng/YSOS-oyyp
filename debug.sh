@@ -13,4 +13,4 @@ gnome-terminal -- bash -c "cd /work/OYOS && python ysos.py launch -d; exec bash"
 sleep 2
 
 # 在第二个终端中运行 GDB 调试
-gnome-terminal -- bash -c "cd /work/OYOS && gdb -q -ex 'file esp/KERNEL.ELF' -ex 'gef-remote --qemu-user localhost 1234' -ex 'b _start' -ex 'b *0xffffff0000004540' -ex 'b ysos_kernel::init' -ex 'c'; exec bash"
+gnome-terminal -- bash -c "cd /work/OYOS && gdb -q -ex 'file esp/KERNEL.ELF' -ex 'gef-remote --qemu-user localhost 1234' -ex 'b _start' -ex 'c'; exec bash"

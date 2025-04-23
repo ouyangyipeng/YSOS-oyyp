@@ -2,18 +2,22 @@
 
 编译内核命令
 python ysos.py build -p debug
-/work/OYOS/debug_script.sh
+/work/OYOS/debug.sh
 
 运行debug脚本命令
 /work/OYOS/debug.sh
+↑ 多窗口
 /work/OYOS/debug_script.sh
 
-设置断点在interrupt
-b interrupt/mod.rs:29
-b *0xffffff0000005d39   /x86_64-0.15.2/src/structures/idt.rs, line 454
-b *0xffffff00000061ca   /spin-0.9.8/src/once.rs, line 230
-b *0xffffff000000614a   /spin-0.9.8/src/once.rs, line 295
-b *0xffffff0000008524
+设置断点
+b proc/mod.rs:112
+b interrupt/clock.rs:19
+b proc/mod.rs:99
+b *0xffffff0000014ad7
+b *0xffffff00000105e7
+
+x/10i 0xffffff0000014ad7
+x/10i 0xffffff00000105e7
 
 杀死脚本tmux进程命令
 tmux kill-session -t oyos-debug
