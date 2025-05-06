@@ -14,7 +14,8 @@ pub fn init(init: Arc<Process>) {
 
     // FIXME: set init process as Running
 
-    init.write().resume();
+    // init.write().resume();
+    init.write().pause();
     debug!("Should resume running: {:#?}", init);
 
     // FIXME: set processor's current pid to init's pid
@@ -188,8 +189,42 @@ impl ProcessManager {
 
     pub fn handle_page_fault(&self, addr: VirtAddr, err_code: PageFaultErrorCode) -> bool {
         // FIXME: handle page fault
-
-        false
+        if err_code.contains(PageFaultErrorCode::PROTECTION_VIOLATION){
+            warn!("Page fault: protection violation at {:#x}", addr);
+            return false;
+        }else if err_code.contains(PageFaultErrorCode::MALFORMED_TABLE) {
+            warn!("Page fault: malformed table at {:#x}", addr);
+            return false;
+        }else if err_code.contains(PageFaultErrorCode::INSTRUCTION_FETCH) {
+            warn!("Page fault: instruction fetch at {:#x}", addr);
+            return false;
+        }else if err_code.contains(PageFaultErrorCode::PROTECTION_KEY) {
+            warn!("Page fault: protection key at {:#x}", addr);
+            return false;
+        }else if err_code.contains(PageFaultErrorCode::INSTRUCTION_FETCH) {
+            warn!("Page fault: instruction fetch at {:#x}", addr);
+            return false;
+        }else if err_code.contains(PageFaultErrorCode::PROTECTION_KEY) {
+            warn!("Page fault: protection key at {:#x}", addr);
+            return false;
+        }else if err_code.contains(PageFaultErrorCode::SHADOW_STACK) {
+            warn!("Page fault: shadow stack at {:#x}", addr);
+            return false;
+        }else if err_code.contains(PageFaultErrorCode::SGX) || 
+                err_code.contains(PageFaultErrorCode::RMP) {
+            warn!("Page fault: SGX/RMP violation at {:#x}", addr);
+            return false;
+        }else{
+            let cur_proc = self.current();
+            let mut cur_inner = cur_proc.write();
+            let vm = cur_inner.vm_mut();
+            if vm.handle_page_fault(addr) {
+                return true;
+            } else {
+                warn!("Page fault: failed to handle page fault at {:#x}", addr);
+                return false;
+            }
+        }
     }
 
     pub fn kill(&self, pid: ProcessId, ret: isize) {

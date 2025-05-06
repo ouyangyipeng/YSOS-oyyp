@@ -29,6 +29,15 @@ pub fn kernel_main(boot_info: &'static boot::BootInfo) -> ! {
 
     let mut test_num = 0;
 
+    // run 5 test
+    // for _ in 0..50 {
+    //     ysos::new_test_thread(format!("{}", test_num).as_str());
+    //     test_num += 1;
+    // }
+
+    // run 1 stack
+    // ysos::new_stack_test_thread();
+
     loop {
         print!("[>] ");
         let line = input::get_line();

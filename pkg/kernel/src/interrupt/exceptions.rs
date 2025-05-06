@@ -91,28 +91,44 @@ pub extern "x86-interrupt" fn double_fault_handler(
 }
 
 // 14
-pub extern "x86-interrupt" fn page_fault_handler(
-    stack_frame: InterruptStackFrame,
-    err_code: PageFaultErrorCode,
-) {
-    panic!(
-        "EXCEPTION: PAGE FAULT, ERROR_CODE: {:?}\n\nTrying to access: {:#x}\n{:#?}",
-        err_code,
-        Cr2::read().unwrap_or(VirtAddr::new_truncate(0xdeadbeef)),
-        stack_frame
-    );
-}
 // pub extern "x86-interrupt" fn page_fault_handler(
 //     stack_frame: InterruptStackFrame,
 //     err_code: PageFaultErrorCode,
 // ) {
 //     panic!(
-//         "EXCEPTION: PAGE FAULT, ERROR_CODE: {:?}\n\nTrying to access:\n{:#?}",
+//         "EXCEPTION: PAGE FAULT, ERROR_CODE: {:?}\n\nTrying to access: {:#x}\n{:#?}",
 //         err_code,
+//         Cr2::read().unwrap_or(VirtAddr::new_truncate(0xdeadbeef)),
 //         stack_frame
 //     );
 // }
-
+pub extern "x86-interrupt" fn page_fault_handler(
+    stack_frame: InterruptStackFrame,
+    err_code: PageFaultErrorCode,
+) {
+    let addr = match Cr2::read() {
+        Ok(addr) => addr,
+        Err(_) => {
+            VirtAddr::new_truncate(0xBAADF00D)
+        }
+    };
+    if !crate::proc::handle_page_fault(
+            addr,
+            err_code
+        ) {
+        warn!(
+            "EXCEPTION: PAGE FAULT, ERROR_CODE: {:?}\n\nTrying to access: {:#x}\n{:#?}",
+            err_code,
+            addr,
+            stack_frame
+        );
+        // FIXME: print info about which process causes page fault?
+        info!("Current process: {:#?}", 
+            crate::proc::manager::get_process_manager().current()
+        );
+        panic!("Cannot handle page fault!");
+    }
+}
 
 
 /* ----需要独立栈的处理函数---- */

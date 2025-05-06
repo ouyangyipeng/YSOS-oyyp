@@ -133,8 +133,8 @@ impl LocalApic for XApic {
             // ! FIXME: The timer repeatedly counts down at bus frequency
             // 设置定时器的分频系数
             // self.write(0x3E0, 0b1011); // set Timer Divide to 1
-            self.write(0x3E0, 0b0011); // set Timer Divide to 16
-            self.write(0x380, 0x20000); // set initial count to 0x20000
+            self.write(0x3E0, 0b1010); // set Timer Divide to 128
+            self.write(0x380, 0x80000); // set initial count to 0x80000
 
             // lvt reg
             let mut lvt_timer = self.read(0x320);

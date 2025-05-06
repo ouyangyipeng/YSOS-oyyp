@@ -109,8 +109,7 @@ pub fn switch(context: &mut ProcessContext) {
 
         //      - restore next process's context
         let next_pid = manager::get_process_manager().switch_next(context);
-        trace!("Current process context: {:#?}", context);
-        trace!("Switch to process {}", next_pid);
+        // info!("Switch from {} to {}", pid, next_pid);
     });
 }
 

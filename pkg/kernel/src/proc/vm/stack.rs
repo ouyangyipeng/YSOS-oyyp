@@ -104,6 +104,43 @@ impl Stack {
         debug_assert!(self.is_on_stack(addr), "Address is not on stack.");
 
         // FIXME: grow stack for page fault
+        let new_start = Page::<Size4KiB>::containing_address(addr);
+        let pre_start = self.range.start;
+        let pre_end = self.range.end;
+        let new_count = pre_start - new_start;// 不太确定，要不要+1？
+        let new_range = Page::range(new_start, pre_end);
+        let new_usage = pre_end - new_start;
+        
+        match elf::map_range(
+            new_start.start_address().as_u64(),
+            new_count,
+            mapper,
+            alloc,
+        ) {
+            Ok(range) => {
+                info!("Stack range: {:#?}", range);
+                self.range = new_range;
+                self.usage += new_usage;
+            }
+            Err(e) => {
+                error!("Failed to map stack: {:#?}", e);
+                return Err(e);
+            }
+        }
+
+        self.usage = new_usage;
+        self.range = new_range;
+
+        trace!(
+            "Stack range: {:#x} -> {:#x}",
+            self.range.start.start_address().as_u64(),
+            self.range.end.start_address().as_u64()
+        );
+        trace!(
+            "Stack usage: {:#x} -> {:#x}",
+            self.range.start.start_address().as_u64(),
+            self.usage
+        );
 
         Ok(())
     }
