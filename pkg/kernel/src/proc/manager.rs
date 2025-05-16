@@ -1,16 +1,17 @@
 use super::*;
-use crate::memory::{
-    self,
-    allocator::{ALLOCATOR, HEAP_SIZE},
-    get_frame_alloc_for_sure, PAGE_SIZE,
-};
-use crate::proc::vm::ProcessVm;
-use alloc::{collections::*, format, string::String, sync::Arc};
+// use crate::memory::{
+//     self,
+//     allocator::{ALLOCATOR, HEAP_SIZE},
+//     get_frame_alloc_for_sure, PAGE_SIZE,
+// };
+use crate::{memory, proc::vm::ProcessVm};
+use alloc::{collections::*, format, string::String, sync::Arc, sync::Weak};
 use spin::{Mutex, RwLock};
+use vm::stack::STACK_INIT_TOP;
 
 pub static PROCESS_MANAGER: spin::Once<ProcessManager> = spin::Once::new();
 
-pub fn init(init: Arc<Process>) {
+pub fn init(init: Arc<Process>, app_list: boot::AppListRef) {
 
     // FIXME: set init process as Running
 
@@ -23,7 +24,7 @@ pub fn init(init: Arc<Process>) {
     processor::set_pid(init.pid());
     processor::print_processors();
 
-    PROCESS_MANAGER.call_once(|| ProcessManager::new(init));
+    PROCESS_MANAGER.call_once(|| ProcessManager::new(init, app_list));
     info!("Process Manager initialized");
     debug!("Process Manager: {:#?}", PROCESS_MANAGER.get().unwrap().processes.read());
     debug!("Process Manager: {:#?}", PROCESS_MANAGER.get().unwrap().ready_queue.lock());
@@ -40,10 +41,11 @@ pub fn get_process_manager() -> &'static ProcessManager {
 pub struct ProcessManager {
     processes: RwLock<BTreeMap<ProcessId, Arc<Process>>>,
     ready_queue: Mutex<VecDeque<ProcessId>>,
+    app_list: boot::AppListRef,
 }
 
 impl ProcessManager {
-    pub fn new(init: Arc<Process>) -> Self {
+    pub fn new(init: Arc<Process>, app_list: boot::AppListRef) -> Self {
         let mut processes = BTreeMap::new();
         let ready_queue = VecDeque::new();
         let pid = init.pid();
@@ -54,7 +56,12 @@ impl ProcessManager {
         Self {
             processes: RwLock::new(processes),
             ready_queue: Mutex::new(ready_queue),
+            app_list: app_list,
         }
+    }
+
+    pub fn app_list(&self) -> boot::AppListRef {
+        self.app_list
     }
 
     #[inline]
@@ -75,6 +82,14 @@ impl ProcessManager {
     pub fn current(&self) -> Arc<Process> {
         self.get_proc(&processor::get_pid())
             .expect("No current process")
+    }
+
+    pub fn read(&self, fd: u8, buf: &mut [u8]) -> isize {
+        self.current().read().read(fd, buf)
+    }
+
+    pub fn write(&self, fd: u8, buf: &[u8]) -> isize {
+        self.current().read().write(fd, buf)
     }
 
     pub fn save_current(&self, context: &ProcessContext) {
@@ -151,39 +166,92 @@ impl ProcessManager {
         next_pid
     }
 
-    pub fn spawn_kernel_thread(
+    // ! discarded code in 0x04
+    // pub fn spawn_kernel_thread(
+    //     &self,
+    //     entry: VirtAddr,
+    //     name: String,
+    //     proc_data: Option<ProcessData>,
+    // ) -> ProcessId {
+    //     let kproc = self.get_proc(&KERNEL_PID).unwrap();
+    //     let page_table = kproc.read().clone_page_table();
+    //     let proc_vm = Some(ProcessVm::new(page_table));
+    //     let proc = Process::new(name, Some(Arc::downgrade(&kproc)), proc_vm, proc_data);
+
+    //     let pid = proc.pid();
+
+    //     // alloc stack for the new process base on pid
+    //     let stack_top = proc.alloc_init_stack();
+
+    //     // FIXME: set the stack frame
+    //     proc.write().init_stack_frame(entry, stack_top);
+
+    //     // FIXME: add to process map
+    //     self.add_proc(pid, proc);
+    //     trace!("Spawn process #{}", pid);
+
+    //     // FIXME: push to ready queue
+    //     self.push_ready(pid);
+    //     trace!("Push process #{} to ready queue", pid);
+
+    //     // FIXME: return new process pid
+    //     info!("Spawn process #{} with stack top {:#x}", pid, stack_top);
+    //     pid
+    // }
+
+    pub fn spawn(
         &self,
-        entry: VirtAddr,
+        elf: &ElfFile,
         name: String,
+        parent: Option<Weak<Process>>,
         proc_data: Option<ProcessData>,
     ) -> ProcessId {
         let kproc = self.get_proc(&KERNEL_PID).unwrap();
         let page_table = kproc.read().clone_page_table();
         let proc_vm = Some(ProcessVm::new(page_table));
-        let proc = Process::new(name, Some(Arc::downgrade(&kproc)), proc_vm, proc_data);
-
+        // info!("ProcessVm: {:#?}", proc_vm);
+        let proc = Process::new(name, parent, proc_vm, proc_data);
+        // info!("Process: {:#?}", proc);
         let pid = proc.pid();
 
-        // alloc stack for the new process base on pid
+        // let mut inner = proc.write();
+        // info!("Stack top");
+        let entry = VirtAddr::new(elf.header.pt2.entry_point());
+        // FIXME: load elf to process pagetable
+        // info!("Load ELF: {:#?}", elf);
+        // inner.load_elf(elf);
+        proc.write().load_elf(elf);
+        // info!("Load ELF done");
+        // FIXME: alloc new stack for process
+        // inner.init_stack_frame(entry, stack_top);
+        
         let stack_top = proc.alloc_init_stack();
-
-        // FIXME: set the stack frame
         proc.write().init_stack_frame(entry, stack_top);
+        // proc.write().init_stack_frame(entry,  VirtAddr::new_truncate(STACK_INIT_TOP));
+        // FIXME: mark process as ready
+        // inner.pause();
+        proc.write().pause();
 
-        // FIXME: add to process map
+        // 内存使用量
+        // let proc_vm = inner.vm_mut();
+        // let memory_usage = proc_vm.memory_usage();
+        // inner.data_mut().set_memory_usage(memory_usage);
+
+        // 其他data可以在这里加
+
+        // drop(inner);
+
+        // info!("New {:#?}", &proc);
+
+        // FIXME: something like kernel thread
         self.add_proc(pid, proc);
-        trace!("Spawn process #{}", pid);
-
-        // FIXME: push to ready queue
         self.push_ready(pid);
-        trace!("Push process #{} to ready queue", pid);
+        info!("Push process #{} to ready queue", pid);
 
-        // FIXME: return new process pid
-        info!("Spawn process #{} with stack top {:#x}", pid, stack_top);
-        pid
+        pid 
     }
 
-    pub fn kill_current(&self, ret: isize) {
+    pub fn kill_current(&self, mut ret: isize) {
         self.kill(processor::get_pid(), ret);
     }
 
@@ -227,7 +295,17 @@ impl ProcessManager {
         }
     }
 
-    pub fn kill(&self, pid: ProcessId, ret: isize) {
+    pub fn kill_self(&self, ret: isize) {
+        let pid = processor::get_pid();
+        if pid == KERNEL_PID {
+            warn!("Kernel process cannot be killed.");
+            panic!("trying to kill kernel")
+        } else {
+            self.kill(pid, ret);
+        }
+    }
+
+    pub fn kill(&self, pid: ProcessId, mut ret: isize) {
         let proc = self.get_proc(&pid);
 
         if proc.is_none() {
@@ -248,13 +326,22 @@ impl ProcessManager {
     }
 
     pub fn print_process_list(&self) {
-        let mut output = String::from("  PID | PPID | Process Name |  Ticks  | Status\n");
+        // let mut output = String::from("  PID | PPID | Process Name |  Ticks  | Status\n");
 
-        self.processes
-            .read()
-            .values()
-            .filter(|p| p.read().status() != ProgramStatus::Dead)
-            .for_each(|p| output += format!("{}\n", p).as_str());
+        // self.processes
+        //     .read()
+        //     .values()
+        //     .filter(|p| p.read().status() != ProgramStatus::Dead)
+        //     .for_each(|p| output += format!("{}\n", p).as_str());
+
+        let mut output =
+            String::from("  PID | PPID | Process Name |  Ticks  | Status | Memory Usage\n");
+
+        for (_, p) in self.processes.read().iter() {
+            if p.read().status() != ProgramStatus::Dead {
+                output += format!("{}\n", p).as_str();
+            }
+        }
 
         // TODO: print memory usage of kernel heap
 

@@ -13,7 +13,9 @@ pub const PAGE_FAULT_IST_INDEX: u16 = 1;    // 页故障栈索引:栈1用于页�
 // pub const GPF_IST_INDEX: u16 = 3;          // 一般保护故障栈索引：栈3用于一般保护故障
 // pub const MACHINE_CHECK_IST_INDEX: u16 = 4; // 机器检查栈索引：栈4用于机器检查异常（这个不一定要）
 // pub const NMI_IST_INDEX: u16 = 5;         // 非屏蔽中断栈索引：栈5用于非屏蔽中断
-pub const CLOCK_IST_INDEX: u16 = 2;       // 定时器栈索引：栈4用于定时器中断
+pub const CLOCK_IST_INDEX: u16 = 2;       // 定时器栈索引：栈2用于定时器中断
+
+pub const SYSCALL_IST_INDEX:u16 =3;       // 系统调用栈索引：栈3用于系统调用中断
 
 pub const IST_SIZES: [usize; 8] = [0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000]; // 每个IST栈大小(4KB)
 
@@ -60,7 +62,7 @@ lazy_static! {// 延迟初始化复杂全局变量，避免编译期计算(上�
         // FIXME: fill tss.interrupt_stack_table with the static stack buffers like above
         // You can use `tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize]`
 
-        // 中断1号栈double fault
+        // 中断0号栈double fault
         tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize]={
             const STACK_SIZE:usize=IST_SIZES[1];
             static mut STACK:[u8;STACK_SIZE]=[0;STACK_SIZE];
@@ -74,7 +76,7 @@ lazy_static! {// 延迟初始化复杂全局变量，避免编译期计算(上�
             stack_end
         };
 
-        // 中断2号栈page fault
+        // 中断1号栈page fault
         tss.interrupt_stack_table[PAGE_FAULT_IST_INDEX as usize] = {
             const STACK_SIZE: usize = IST_SIZES[2];
             static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
@@ -118,7 +120,7 @@ lazy_static! {// 延迟初始化复杂全局变量，避免编译期计算(上�
         // };
         
 
-        // 中断5号栈timer
+        // 中断2号栈timer
         tss.interrupt_stack_table[CLOCK_IST_INDEX as usize] = {
             const STACK_SIZE: usize = IST_SIZES[0];
             static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
@@ -160,22 +162,42 @@ lazy_static! {// 延迟初始化复杂全局变量，避免编译期计算(上�
         //     stack_end
         // };
 
+        // 中断3号栈syscall
+        tss.interrupt_stack_table[SYSCALL_IST_INDEX as usize] = {
+            const STACK_SIZE: usize = IST_SIZES[0];
+            static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+            let stack_start = VirtAddr::from_ptr(addr_of_mut!(STACK));
+            let stack_end = stack_start + STACK_SIZE as u64;
+            info!(
+                "Interrupt(Syscall) Stack  : 0x{:016x}-0x{:016x}",
+                stack_start.as_u64(),
+                stack_end.as_u64()
+            );
+            stack_end
+        };
+
         tss
     };
 }
 
 lazy_static! {
-    static ref GDT: (GlobalDescriptorTable, KernelSelectors) = {// GDT表及选择
+    static ref GDT: (GlobalDescriptorTable, KernelSelectors, UserSelectors) = {// GDT表及选择
         let mut gdt = GlobalDescriptorTable::new();
         let code_selector = gdt.append(Descriptor::kernel_code_segment());// 内核代码段（可执行）
         let data_selector = gdt.append(Descriptor::kernel_data_segment());// 内核数据段不执行可读写
         let tss_selector = gdt.append(Descriptor::tss_segment(&TSS));// 任务状态段描述符
+        let user_code_selector = gdt.append(Descriptor::user_code_segment());// 用户代码段（可执行）
+        let user_data_selector = gdt.append(Descriptor::user_data_segment());// 用户数据段不执行可读写
         (
             gdt,
             KernelSelectors {
                 code_selector,
                 data_selector,
                 tss_selector,
+            },
+            UserSelectors {
+                user_code_selector,
+                user_data_selector,
             },
         )
     };
@@ -187,6 +209,11 @@ pub struct KernelSelectors {
     pub code_selector: SegmentSelector, // 代码段选择子（供内存管理使用）
     pub data_selector: SegmentSelector, // 数据段选择子（供内存管理使用）
     tss_selector: SegmentSelector,    // 任务状态段选择子（不直接暴露，这个只给内部加载用）
+}
+
+pub struct UserSelectors {
+    pub user_code_selector: SegmentSelector, // 用户代码段选择子（供内存管理使用）
+    pub user_data_selector: SegmentSelector, // 用户数据段选择子（供内存管理使用）
 }
 
 // ! 初始化函数
@@ -231,6 +258,6 @@ pub fn get_selector() -> &'static KernelSelectors {
 }
 
 // ! 用户态选择子获取接口
-// pub fn get_user_selector() -> SegmentSelector {
-//     SegmentSelector::new(0, PrivilegeLevel::Ring3)
-// }
+pub fn get_user_selector() -> &'static UserSelectors {
+    &GDT.2
+}

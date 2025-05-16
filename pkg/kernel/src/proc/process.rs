@@ -7,6 +7,10 @@ use spin::*;
 use x86_64::structures::paging::mapper::MapToError;
 use x86_64::structures::paging::page::PageRange;
 use x86_64::structures::paging::*;
+use elf::*;
+use x86_64::VirtAddr;
+// for Type::Load
+use xmas_elf::program::Type;
 
 #[derive(Clone)]
 pub struct Process {
@@ -75,7 +79,7 @@ impl Process {
         })
     }
 
-    pub fn kill(&self, ret: isize) {
+    pub fn kill(&self, mut ret: isize) {
         let mut inner = self.inner.write();
 
         debug!(
@@ -85,10 +89,11 @@ impl Process {
             ret
         );
 
-        inner.kill(ret);
+        inner.kill(self.pid, ret);
     }
 
     pub fn alloc_init_stack(&self) -> VirtAddr {
+        // info!("Allocating init stack for process");
         self.write().vm_mut().init_proc_stack(self.pid)
     }
 }
@@ -139,7 +144,16 @@ impl ProcessInner {
     }
 
     pub fn vm_mut(&mut self) -> &mut ProcessVm {
+        // info!("vm_mut");
         self.proc_vm.as_mut().unwrap()
+    }
+
+    pub fn data(&self) -> &ProcessData {
+        self.proc_data.as_ref().unwrap()
+    }
+
+    pub fn data_mut(&mut self) -> &mut ProcessData {
+        self.proc_data.as_mut().unwrap()
     }
 
     pub fn handle_page_fault(&mut self, addr: VirtAddr) -> bool {
@@ -186,16 +200,76 @@ impl ProcessInner {
         self.parent.as_ref().and_then(|p| p.upgrade())
     }
 
-    pub fn kill(&mut self, ret: isize) {
+    pub fn kill(&mut self, pid:ProcessId, ret: isize) {
         // FIXME: set exit code
         self.exit_code = Some(ret);
 
         // FIXME: set status to dead
         self.status = ProgramStatus::Dead;
+        // info!("Process {}#{} killed.{}", self.name, pid, ret);
 
         // FIXME: take and drop unused resources
+        // self.clean_stack(pid);
         self.proc_vm.take();
         self.proc_data.take();
+    }
+
+    // fn clean_stack(&mut self, pid: ProcessId) {
+    //     let page_table = self.page_table.take().unwrap();
+    //     let mut mapper = page_table.mapper();
+
+    //     let frame_deallocator = &mut *get_frame_alloc_for_sure();
+    //     let start_count = frame_deallocator.recycled_count();
+
+    //     let proc_data = self.proc_data.as_mut().unwrap();
+    //     let stack = proc_data.stack_segment.unwrap();
+
+    //     trace!(
+    //         "Free stack for {}#{}: [{:#x} -> {:#x}) ({} frames)",
+    //         self.name,
+    //         pid,
+    //         stack.start.start_address(),
+    //         stack.end.start_address(),
+    //         stack.count()
+    //     );
+
+    //     elf::unmap_range(
+    //         stack.start.start_address().as_u64(),
+    //         stack.count() as u64,
+    //         &mut mapper,
+    //         frame_deallocator,
+    //         true,
+    //     )
+    //     .unwrap();
+
+    // }
+
+    /// elf的load elf
+    // pub fn load_elf(&mut self, elf: &ElfFile) {
+    //     self.vm_mut().load_elf(elf);
+    // }
+    pub fn load_elf(&mut self , elf: &ElfFile){
+        // let mut code_pages = 0;
+        // let mut code_start = None;
+
+        // // 遍历 ELF 程序头
+        // for ph in elf.program_iter() {
+        //     if ph.get_type() == Ok(Type::Load) && ph.flags().is_execute() {
+        //         // 记录代码段起始地址（第一个可执行段）
+        //         if code_start.is_none() {
+        //             code_start = Some(VirtAddr::new(ph.virtual_addr()));
+        //         }
+
+        //         // 计算该段占用的页数
+        //         let page_count = ((ph.virtual_addr() + ph.mem_size() + 0xfff) & !0xfff) / 0x1000;
+        //         code_pages += page_count as usize;
+        //     }
+        // }
+        // self.data_mut().code_pages = code_pages;
+        // if let Some(start) = code_start {
+        //     self.data_mut().code_start = start;
+        // }
+        self.vm_mut().load_elf(elf)
     }
 }
 
@@ -248,12 +322,17 @@ impl core::fmt::Display for Process {
         let inner = self.inner.read();
         write!(
             f,
-            " #{:-3} | #{:-3} | {:12} | {:7} | {:?}",
+            // " #{:-3} | #{:-3} | {:12} | {:7} | {:?} | {:?} | {:?} | {:?}",
+            " #{:-3} | #{:-3} | {:12} | {:7} | {:?} | {:?}",
             self.pid.0,
             inner.parent().map(|p| p.pid.0).unwrap_or(0),
             inner.name,
             inner.ticks_passed,
-            inner.status
+            inner.status,
+            inner.vm().memory_usage(),
+            // inner.data().memory_usage(),
+            // inner.data().code_pages(),
+            // inner.data().code_start(),
         )?;
         Ok(())
     }

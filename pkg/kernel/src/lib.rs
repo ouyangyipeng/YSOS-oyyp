@@ -43,13 +43,13 @@ pub fn init(boot_info: &'static BootInfo) {
     serial::init(); // init serial output
     logger::init(); // init logger system
     memory::address::init(boot_info);
-    memory::gdt::init(); // init gdt
     memory::allocator::init(); // init kernel heap allocator
+    memory::gdt::init(); // init gdt
     trace!("Debug: Kernel Heap Initialized.");
-    interrupt::init(); // init interrupts
     memory::init(boot_info); // init memory manager
+    interrupt::init(); // init interrupts
 
-    proc::init(); // init process manager
+    proc::init(boot_info); // init process manager
     trace!("Debug: Process Manager Initialized.");
 
     x86_64::instructions::interrupts::enable();
@@ -61,4 +61,30 @@ pub fn init(boot_info: &'static BootInfo) {
 pub fn shutdown() -> ! {
     info!("YatSenOS shutting down.");
     uefi::runtime::reset(ResetType::SHUTDOWN, Status::SUCCESS, None);
+}
+
+pub fn humanized_size(size: u64) -> (f64, &'static str) {
+    const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
+
+    if size == 0 {
+        return (0.0, UNITS[0]);
+    }
+
+    let index = libm::floor(libm::log(size as f64) / libm::log(1024.0)) as usize;
+    let index = index.min(UNITS.len() - 1);
+
+    let converted_size = size as f64 / libm::pow(1024.0, index as f64);
+
+    (converted_size, UNITS[index])
+}
+
+pub fn wait(init: proc::ProcessId) {
+    loop {
+        if proc::still_alive(init) {
+            // Why? Check reflection question 5
+            x86_64::instructions::hlt();
+        } else {
+            break;
+        }
+    }
 }

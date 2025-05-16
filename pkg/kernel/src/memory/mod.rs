@@ -1,6 +1,7 @@
 pub mod address;// 地址相关的
 pub mod allocator;// 分配器相关
 mod frames;// 帧相关（内部私有
+pub mod user;// 用户态相关
 
 pub mod gdt;// GDT相关
 
@@ -38,6 +39,9 @@ pub fn init(boot_info: &'static boot::BootInfo) {
             usable_mem_size as usize,
         ));
     }
+
+    // 初始化用户态堆分配器
+    user::init();
 
     info!("Frame Allocator initialized.");
 }

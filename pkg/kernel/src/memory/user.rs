@@ -1,3 +1,5 @@
+// use core::range;
+
 use crate::proc::PageTableContext;
 use linked_list_allocator::LockedHeap;
 use x86_64::structures::paging::{
@@ -25,6 +27,22 @@ pub fn init_user_heap() -> Result<(), MapToError<Size4KiB>> {
 
     // FIXME: use elf::map_range to allocate & map
     //        frames (R/W/User Access)
+    match elf::map_range(
+        USER_HEAP_START as u64,
+        USER_HEAP_PAGE as u64,
+        mapper,
+        frame_allocator,
+        true,
+        // true
+    ) {
+        Ok(range) => {
+            trace!("User Heap Range: {:?}", range);
+        }
+        Err(e) => {
+            error!("User Heap Mapping Error: {:?}", e);
+            return Err(e);
+        }
+    }
 
     unsafe {
         USER_ALLOCATOR

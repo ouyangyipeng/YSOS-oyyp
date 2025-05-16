@@ -1,4 +1,8 @@
+use core::fmt;
+use alloc::format;
 use syscall_def::Syscall;
+// fmt
+
 
 #[inline(always)]
 pub fn sys_write(fd: u8, buf: &[u8]) -> Option<usize> {
@@ -34,8 +38,10 @@ pub fn sys_read(fd: u8, buf: &mut [u8]) -> Option<usize> {
 pub fn sys_wait_pid(pid: u16) -> isize {
     // FIXME: try to get the return value for process
     //        loop until the process is finished
-
-    0
+    let ret = syscall!(Syscall::WaitPid, pid as u64) as isize;
+    let s =format!("Process {} exited with code {}", pid, ret);
+    sys_write(1, s.as_bytes());
+    ret
 }
 
 #[inline(always)]
@@ -70,6 +76,8 @@ pub fn sys_get_pid() -> u16 {
 
 #[inline(always)]
 pub fn sys_exit(code: isize) -> ! {
+    let s = format!("Process exited with code {}", code);
+    sys_write(1, s.as_bytes());
     syscall!(Syscall::Exit, code as u64);
     unreachable!("This process should be terminated by now.")
 }

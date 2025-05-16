@@ -4,17 +4,22 @@ pub mod manager;
 mod paging;
 mod pid;
 mod process;
-mod processor;
+pub mod processor;
 mod vm;
 
 use manager::*;
 use process::*;
 use crate::proc::vm::ProcessVm;
 use crate::memory::PAGE_SIZE;
+use alloc::sync::Arc;
+use xmas_elf::ElfFile;
+use alloc::string::{String, ToString};
 
 use itoa::Buffer;
+// Vec
+use alloc::vec::Vec;
 
-use alloc::string::String;
+// use alloc::string::String;
 pub use context::ProcessContext;
 pub use paging::PageTableContext;
 pub use data::ProcessData;
@@ -33,7 +38,7 @@ pub enum ProgramStatus {
 }
 
 /// init process manager
-pub fn init() {
+pub fn init(boot_info: &'static boot::BootInfo) {
     /* 将内核包装成进程，并将其传递给 ProcessManager，使其成为第一个进程 */
     let proc_vm = ProcessVm::new(PageTableContext::new()).init_kernel_vm();
 
@@ -78,6 +83,7 @@ pub fn init() {
         "kernel_memory_usage",
         Buffer::new().format(proc_vm.memory_usage()),
     );
+    // kproc_data.set_memory_usage(proc_vm.memory_usage());
 
     // kernel process
     let kproc = Process::new(
@@ -86,7 +92,8 @@ pub fn init() {
         Some(proc_vm),
         Some(kproc_data),
     );
-    manager::init(kproc);
+    let app_list = boot_info.loaded_apps.as_ref();
+    manager::init(kproc, app_list);
     manager::get_process_manager().print_process_list();
 }
 
@@ -109,16 +116,17 @@ pub fn switch(context: &mut ProcessContext) {
 
         //      - restore next process's context
         let next_pid = manager::get_process_manager().switch_next(context);
-        // info!("Switch from {} to {}", pid, next_pid);
+        trace!("Switch from {} to {}", pid, next_pid);
     });
 }
 
-pub fn spawn_kernel_thread(entry: fn() -> !, name: String, data: Option<ProcessData>) -> ProcessId {
-    x86_64::instructions::interrupts::without_interrupts(|| {
-        let entry = VirtAddr::new(entry as usize as u64);
-        get_process_manager().spawn_kernel_thread(entry, name, data)
-    })
-}
+// ! discarded code in 0x04
+// pub fn spawn_kernel_thread(entry: fn() -> !, name: String, data: Option<ProcessData>) -> ProcessId {
+//     x86_64::instructions::interrupts::without_interrupts(|| {
+//         let entry = VirtAddr::new(entry as usize as u64);
+//         get_process_manager().spawn_kernel_thread(entry, name, data)
+//     })
+// }
 
 pub fn print_process_list() {
     x86_64::instructions::interrupts::without_interrupts(|| {
@@ -147,4 +155,156 @@ pub fn handle_page_fault(addr: VirtAddr, err_code: PageFaultErrorCode) -> bool {
     x86_64::instructions::interrupts::without_interrupts(|| {
         get_process_manager().handle_page_fault(addr, err_code)
     })
+}
+
+pub fn list_app() {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        let app_list = get_process_manager().app_list();
+        if app_list.is_none() {
+            println!("[!] No app found in list!");
+            return;
+        }
+
+        let apps = app_list
+            .unwrap()
+            .iter()
+            .map(|app| app.name.as_str())
+            .collect::<Vec<&str>>()
+            .join(", ");
+
+        // TODO: print more information like size, entry point, etc.
+
+        println!("[+] App list:");
+        for app in app_list.unwrap() {
+            println!("[+] App: {}", app.name.as_str());
+            
+            // 打印完整的 ELF 头信息
+            // println!("{}", app.elf.header);
+            
+            // 添加额外的格式化信息
+            // println!("    ELF Class:        {:?}", app.elf.header.pt1.class());
+            // println!("    Data Encoding:    {:?}", app.elf.header.pt1.data());
+            // println!("    OS/ABI:           {:?}", app.elf.header.pt1.os_abi());
+            
+            // 使用 HeaderPt2 的 getter 方法获取统一的值
+            println!("    Entry Point:      0x{:016X}", app.elf.header.pt2.entry_point());
+            println!("    Program Headers:  {} entries, {} bytes each",
+                    app.elf.header.pt2.ph_count(),
+                    app.elf.header.pt2.ph_entry_size());
+            println!("    Section Headers:  {} entries, {} bytes each",
+                    app.elf.header.pt2.sh_count(),
+                    app.elf.header.pt2.sh_entry_size());
+            
+            // 计算文件大小估计 (这只是粗略估计)
+            // let estimated_size = app.elf.header.pt2.ph_offset() as u64 + 
+            //                     (app.elf.header.pt2.ph_count() as u64 * app.elf.header.pt2.ph_entry_size() as u64);
+            // println!("    Estimated Size:   ~{} bytes", estimated_size);
+            
+            println!("----------------------------------------");
+        }
+        println!("[+] Total {} apps", app_list.unwrap().len());
+        println!("[+] App list end.");
+    });
+}
+
+pub fn spawn(name: &str) -> Option<ProcessId> {
+    let app = x86_64::instructions::interrupts::without_interrupts(|| {
+        let app_list = get_process_manager().app_list()?;
+        app_list.iter().find(|&app| app.name.eq(name))
+    })?;
+    // info!("Found app: {}", name);
+
+    elf_spawn(name.to_string(), &app.elf)
+}
+
+pub fn elf_spawn(name: String, elf: &ElfFile) -> Option<ProcessId> {
+    let pid = x86_64::instructions::interrupts::without_interrupts(|| {
+        let manager = get_process_manager();
+        let process_name = name.to_lowercase();
+        let parent = Arc::downgrade(&manager.current());
+        // info!("Spawning process: {}", process_name);
+        let pid = manager.spawn(elf, name, Some(parent), None);
+
+        info!("Spawned process: {}#{}", process_name, pid);
+        pid
+    });
+
+    Some(pid)
+}
+
+pub fn read(fd: u8, buf: &mut [u8]) -> isize {
+    x86_64::instructions::interrupts::without_interrupts(|| get_process_manager().read(fd, buf))
+}
+
+pub fn write(fd: u8, buf: &[u8]) -> isize {
+    x86_64::instructions::interrupts::without_interrupts(|| get_process_manager().write(fd, buf))
+}
+
+pub fn exit(mut ret: isize, context: &mut ProcessContext) {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        let manager = get_process_manager();
+        // FIXME: implement this for ProcessManager
+        manager.kill_self(ret);
+        // info!("Process {} exited with code {}", manager.current().read().name(), ret);
+        manager.switch_next(context);
+        // info!("Process {} switched", manager.current().read().name());
+    })
+}
+
+pub fn wait_process(pid: ProcessId, context: &mut ProcessContext){
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        let proc = get_process_manager().get_proc(&pid).unwrap();
+        // if !still_alive(pid) {
+        //     let exit_code = proc.read().exit_code().unwrap();
+        //     context.set_rax(exit_code as usize); 
+        //     info!("Process {} exited with code {}", pid, exit_code);
+        //     get_process_manager().save_current(context);
+        //     get_process_manager().switch_next(context);
+        // }
+        info!("now proc: {}", proc.read().name());
+        if let Some(ret) = proc.read().exit_code() {
+            context.set_rax(ret as usize);
+            info!("Process {} exited with code {}", pid, ret);
+            info!("now proc: {}", proc.read().name());
+            get_process_manager().save_current(context);
+            get_process_manager().switch_next(context);
+        } else if pid == KERNEL_PID {
+            // kernel process
+            context.set_rax(0);
+            info!("Kernel process {}", pid);
+        } else if proc.read().status() == ProgramStatus::Dead {
+            // process is dead
+            context.set_rax(0);
+            info!("Process {} is dead", pid);
+
+        } else {
+            // process is still alive
+            // info!("Process {} is still alive", pid);
+            // super::wait(pid);
+            // info!("Process {} has exited", pid);
+            // let exit_code = proc.read().exit_code().unwrap();
+            // context.set_rax(exit_code as usize);
+            // info!("Process {} exited with code {}", pid, exit_code);
+            // info!("now proc: {}", proc.read().name());
+            // get_process_manager().save_current(context);
+            // info!("now proc: {}", proc.read().name());
+            // get_process_manager().switch_next(context);
+            // info!("Process {} switched", get_process_manager().current().read().name());
+            context.set_rax(2333);
+        }
+    })
+}
+
+#[inline]
+pub fn still_alive(pid: ProcessId) -> bool {
+    // x86_64::instructions::interrupts::without_interrupts(|| {
+        // check if the process is still alive
+        match get_process_manager().get_proc(&pid) {
+            Some(proc) => {
+                let proc = proc.read();
+                proc.status() != ProgramStatus::Dead
+            }
+            _ => false,
+        }
+    // })
 }

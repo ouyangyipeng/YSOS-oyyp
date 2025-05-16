@@ -10,11 +10,12 @@ python ysos.py build -p debug
 /work/OYOS/debug_script.sh
 
 设置断点
-b proc/mod.rs:112
-b interrupt/clock.rs:19
-b proc/mod.rs:99
+b proc/process.rs:96
+b proc/manager.rs:210
+b proc/mod.rs:259
+b main.rs:34
 b *0xffffff0000014ad7
-b *0xffffff00000105e7
+b *0xffffff0000011a59
 
 x/10i 0xffffff0000014ad7
 x/10i 0xffffff00000105e7

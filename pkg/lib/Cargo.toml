@@ -5,3 +5,6 @@ edition.workspace = true
 
 [dependencies]
 syscall_def = { workspace = true }
+spin = { workspace = true}
+lazy_static = { workspace = true }
+crossbeam-queue = { workspace = true }

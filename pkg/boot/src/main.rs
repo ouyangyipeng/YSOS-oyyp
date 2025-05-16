@@ -82,7 +82,7 @@ fn efi_main() -> Status {
     trace!("Physical memory offset: {:#x}", config.physical_memory_offset);
 
     // FIXME: load and map the kernel elf file
-    match load_elf(&elf, config.physical_memory_offset, &mut page_table, &mut frame_allocator){
+    match load_elf(&elf, config.physical_memory_offset, &mut page_table, &mut frame_allocator, false){
         Ok(_) => trace!("Kernel ELF loaded successfully"),
         Err(e) => panic!("Failed to load ELF file: {:?}", e),
     }
@@ -107,7 +107,10 @@ fn efi_main() -> Status {
         stack_start,
         stack_size,
         &mut page_table,
-        &mut frame_allocator)
+        &mut frame_allocator,
+        false,
+        // false,
+    )
     {
         Ok(range) => trace!("Kernel stack mapped: {:#x?}", range),
         Err(e) => panic!("Failed to map kernel stack: {:?}", e),
@@ -121,6 +124,15 @@ fn efi_main() -> Status {
 
     free_elf(elf);
     trace!("ELF file freed");
+
+    // Define Apps
+    let apps = if config.load_apps {
+        info!("Loading apps...");
+        Some(load_apps())
+    } else {
+        info!("Skip loading apps");
+        None
+    };
 
     // 5. Pass system table to kernel
     let ptr = uefi::table::system_table_raw().expect("Failed to get system table");
@@ -138,6 +150,7 @@ fn efi_main() -> Status {
         memory_map: mmap.entries().copied().collect(),
         physical_memory_offset: config.physical_memory_offset,
         system_table,
+        loaded_apps: apps,
     };
 
     // align stack to 8 bytes

@@ -3,11 +3,12 @@ use x86_64::{
     structures::paging::{page::*, *},
     VirtAddr,
 };
+use xmas_elf::ElfFile;
 
 use crate::{humanized_size, memory::*, proc::vm::stack::Stack};
 
 pub mod stack;
-
+use crate::proc::KERNEL_PID;
 use self::stack::*;
 
 use super::{PageTableContext, ProcessId};
@@ -39,18 +40,26 @@ impl ProcessVm {
 
     pub fn init_proc_stack(&mut self, pid: ProcessId) -> VirtAddr {
         // FIXME: calculate the stack for pid
-        let stack_top_addr = STACK_INIT_TOP-((pid.0 as u64 -1) * PAGE_SIZE);
-        let stack_bot_addr = STACK_INIT_BOT-((pid.0 as u64 -1) * PAGE_SIZE);
+        info!("Init process stack for pid: {}", pid);
+        let stack_top_addr = STACK_INIT_TOP-((pid.0 as u64 -1) * 0x1_0000_0000);
+        let stack_bot_addr = STACK_INIT_BOT-((pid.0 as u64 -1) * 0x1_0000_0000);
+        info!("Stack top addr: {:#x}", stack_top_addr);
         let page_table = &mut self.page_table.mapper();
+        // info!("Stack top addr: {:#x}", stack_top_addr);
         let alloc = &mut *get_frame_alloc_for_sure();
+        // info!("Mapping stack for pid: {}", pid);
+        let is_user_access = pid != KERNEL_PID;
+        info!("stack_bot_addr: {:#x}", stack_bot_addr);
         match elf::map_range(
             stack_bot_addr,
-            STACK_DEF_PAGE,
+            1,
             page_table,
             alloc,
+            is_user_access,
+            // false,
         ){
             Ok(range) => {
-                info!("Stack range: {:#?}", range);
+                trace!("Stack range: {:#?}", range);
             }
             Err(e) => {
                 panic!("Failed to map stack: {:#?}", e);
@@ -60,6 +69,7 @@ impl ProcessVm {
             Page::containing_address(VirtAddr::new(stack_top_addr)),
             STACK_DEF_PAGE,
         );
+        info!("Stack: {:#?}", self.stack);
         VirtAddr::new(stack_top_addr)
     }
 
@@ -72,6 +82,33 @@ impl ProcessVm {
 
     pub(super) fn memory_usage(&self) -> u64 {
         self.stack.memory_usage()
+    }
+
+    pub fn load_elf(
+        &mut self,
+        elf: &ElfFile
+    ) {
+        let mapper = &mut self.page_table.mapper();
+        let alloc = &mut *get_frame_alloc_for_sure();
+
+        // init stack
+        self.stack.init(mapper, alloc);
+        // match elf::load_elf(
+        //     elf,
+        //     *PHYSICAL_OFFSET.get().unwrap(),
+        //     mapper,
+        //     alloc,
+        //     true
+        // ) {
+        //     Ok(_) => {
+        //         info!("Process Loaded: {:#?}", elf);
+        //     }
+        //     Err(e) => {
+        //         error!("Failed to load ELF file: {:?}", e);
+        //         panic!("Failed to load ELF file: {:?}", e);
+        //     }
+        // }
+        elf::load_elf(elf, PHYSICAL_OFFSET.get().cloned().unwrap(), mapper, alloc,true).unwrap();
     }
 }
 

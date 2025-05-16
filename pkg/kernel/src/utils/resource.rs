@@ -1,4 +1,12 @@
 use alloc::string::String;
+// use alloc::sync::Arc;
+use alloc::collections::BTreeMap;
+use spin::Mutex;
+// use spin::RwLock;
+// use x86_64::structures::paging::Page;
+// use x86_64::VirtAddr;
+
+
 
 #[derive(Debug, Clone)]
 pub enum StdIO {
@@ -66,9 +74,14 @@ impl Resource {
             Resource::Console(stdio) => match stdio {
                 StdIO::Stdin => {
                     // FIXME: just read from kernel input buffer
-                    Some(0)
+                    if let Some(key) = crate::drivers::input::try_pop_key() {
+                        buf[0] = key;
+                        Some(1)
+                    } else {
+                        Some(0)
+                    }
                 }
-                _ => None,
+                _ => None,// 如果是其他就不支持读取
             },
             Resource::Null => Some(0),
         }

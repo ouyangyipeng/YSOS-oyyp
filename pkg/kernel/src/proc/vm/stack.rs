@@ -2,9 +2,10 @@ use x86_64::{
     structures::paging::{mapper::MapToError, page::*, Page},
     VirtAddr,
 };
+use crate::proc::*;
 
 use super::{FrameAllocatorRef, MapperRef};
-
+use crate::proc::KERNEL_PID;
 // 0xffff_ff00_0000_0000 is the kernel's address space
 pub const STACK_MAX: u64 = 0x4000_0000_0000;
 pub const STACK_MAX_PAGES: u64 = 0x100000;
@@ -65,7 +66,7 @@ impl Stack {
     pub fn init(&mut self, mapper: MapperRef, alloc: FrameAllocatorRef) {
         debug_assert!(self.usage == 0, "Stack is not empty.");
 
-        self.range = elf::map_range(STACK_INIT_BOT, STACK_DEF_PAGE, mapper, alloc).unwrap();
+        self.range = elf::map_range(STACK_INIT_BOT, STACK_DEF_PAGE, mapper, alloc, true).unwrap();
         self.usage = STACK_DEF_PAGE;
     }
 
@@ -109,16 +110,19 @@ impl Stack {
         let pre_end = self.range.end;
         let new_count = pre_start - new_start;// 不太确定，要不要+1？
         let new_range = Page::range(new_start, pre_end);
-        let new_usage = pre_end - new_start;
+        let new_usage = pre_end - pre_start;
+        let is_user_access = processor::get_pid() != KERNEL_PID;
         
         match elf::map_range(
             new_start.start_address().as_u64(),
             new_count,
             mapper,
             alloc,
+            is_user_access,
+            // false,
         ) {
             Ok(range) => {
-                info!("Stack range: {:#?}", range);
+                // info!("Stack range: {:#?}", range);
                 self.range = new_range;
                 self.usage += new_usage;
             }

@@ -46,7 +46,7 @@ impl fmt::Debug for RegistersValue {
 macro_rules! as_handler {
     ($fn: ident) => {
         paste::item! {
-            #[naked]
+            #[unsafe(naked)]
             pub extern "x86-interrupt" fn [<$fn _handler>](_sf: InterruptStackFrame) {
                 unsafe {
                     core::arch::naked_asm!("

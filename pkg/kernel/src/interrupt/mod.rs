@@ -3,10 +3,11 @@ mod consts;
 pub mod clock;
 mod serial;
 mod exceptions;
-
+// use crate::memory::address;
 use apic::*;
 use x86_64::structures::idt::InterruptDescriptorTable;
 use crate::memory::physical_to_virtual;
+pub mod syscall;
 
 use lazy_static::lazy_static;
 
@@ -19,6 +20,7 @@ lazy_static! {
             exceptions::register_idt(&mut idt);
             clock::register_idt(&mut idt);
             serial::register_idt(&mut idt);
+            syscall::register_idt(&mut idt);
         }
         idt
     };
