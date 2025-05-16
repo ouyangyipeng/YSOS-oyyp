@@ -297,7 +297,7 @@ pub fn wait_process(pid: ProcessId, context: &mut ProcessContext){
 
 #[inline]
 pub fn still_alive(pid: ProcessId) -> bool {
-    // x86_64::instructions::interrupts::without_interrupts(|| {
+    x86_64::instructions::interrupts::without_interrupts(|| {
         // check if the process is still alive
         match get_process_manager().get_proc(&pid) {
             Some(proc) => {
@@ -306,5 +306,5 @@ pub fn still_alive(pid: ProcessId) -> bool {
             }
             _ => false,
         }
-    // })
+    })
 }
