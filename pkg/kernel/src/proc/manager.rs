@@ -225,8 +225,8 @@ impl ProcessManager {
         // FIXME: alloc new stack for process
         // inner.init_stack_frame(entry, stack_top);
         
-        let stack_top = proc.alloc_init_stack();
-        proc.write().init_stack_frame(entry, stack_top);
+        // let stack_top = proc.alloc_init_stack();
+        proc.write().init_stack_frame(entry, VirtAddr::new(STACK_INIT_TOP));
         // proc.write().init_stack_frame(entry,  VirtAddr::new_truncate(STACK_INIT_TOP));
         // FIXME: mark process as ready
         // inner.pause();

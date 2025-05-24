@@ -1,6 +1,7 @@
 use alloc::string::String;
 extern crate lib;
 use lib::*;
+use chrono::Timelike;
 
 const RESET: &str = "\x1b[0m";
 const BOLD: &str = "\x1b[1m";
@@ -30,11 +31,12 @@ pub fn format_prompt(counter: u64) {
     let left = format!(
         "╭─\x1b[34m░▒▓\x1b[44m\x1b[37m /work/OYOS\x1b[43m\x1b[30m main !5 \x1b[33m\x1b[40m"
     );
+    let beijing_time = sys_time_beijing();
     
     // 右侧部分
     let right = format!(
-        "\x1b[30m\x1b[40m\x1b[31m 😄✅ │ root@Owen \x1b[47m\x1b[30m{} \x1b[37m\x1b[40m▓▒░\x1b[0m─╮",
-        format_time(counter)
+        "\x1b[30m\x1b[40m\x1b[31m 😄✅ │ root@Owen \x1b[47m\x1b[30m{:02}:{:02}:{:02} \x1b[37m\x1b[40m▓▒░\x1b[0m─╮",
+        beijing_time.hour(), beijing_time.minute(), beijing_time.second()
     );
     // 🤬❌
     // 🤔⚠️

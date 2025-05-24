@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use boot::{MemoryMap, MemoryType};
 use x86_64::structures::paging::{FrameAllocator, FrameDeallocator, PhysFrame, Size4KiB};    // 页帧类型和分配器trait
 use x86_64::PhysAddr;   // 物理地址类型
+use alloc::vec::Vec;
 
 // ! 同步原语宏（自定义）:实现线程安全的单例访问模式
 once_mutex!(pub FRAME_ALLOCATOR: BootInfoFrameAllocator);   // 创建延迟初始化的互斥锁
@@ -9,6 +10,7 @@ once_mutex!(pub FRAME_ALLOCATOR: BootInfoFrameAllocator);   // 创建延迟初�
 guard_access_fn! {
     pub get_frame_alloc(FRAME_ALLOCATOR: BootInfoFrameAllocator)    // 生成安全的访问接口，强制调用者持有锁
 }
+const RS_ALIGN_4KIB: u64 = 12;
 
 // ! 页帧迭代器类型
 type BootInfoFrameIter = Box<dyn Iterator<Item = PhysFrame> + Send>;
@@ -18,6 +20,7 @@ pub struct BootInfoFrameAllocator {
     size: usize,
     used: usize,
     frames: BootInfoFrameIter,
+    recycled: Vec<u32>,
 }
 
 // ! 主结构体
@@ -32,6 +35,7 @@ impl BootInfoFrameAllocator {
             size,       // 总可用页帧数
             frames: create_frame_iter(memory_map),  // 页帧迭代器:动态分发的迭代器（Box<dyn Iterator>），支持遍历所有可用物理页帧
             used: 0,    // 已分配页帧计数
+            recycled: Vec::new(),   // 回收页帧列表
         }
     }
 
@@ -42,21 +46,47 @@ impl BootInfoFrameAllocator {
     pub fn frames_total(&self) -> usize {
         self.size
     }
+
+    pub fn recycled_count(&self) -> usize {
+        self.recycled.len() as usize
+    }
 }
 
 // ! 实现分配器接口
 unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame> {
         /* 每次调用从迭代器获取下一个可用页帧，递增used计数器（即使返回None也计数，可能存在统计偏差） */
-        self.used += 1;
-        self.frames.next()
+        // self.used += 1;
+        // self.frames.next()
+        if let Some(frame) = self.recycled.pop() {
+            Some(u32_to_phys_frame(frame))
+        } else {
+            self.used += 1;
+            self.frames.next()
+        }
     }
 }
 
 impl FrameDeallocator<Size4KiB> for BootInfoFrameAllocator {
     unsafe fn deallocate_frame(&mut self, _frame: PhysFrame) {
         // TODO: deallocate frame (not for lab 2)
+        let key = phys_frame_to_u32(_frame);
+        self.recycled.push(key);
     }
+}
+
+#[inline(always)]
+fn phys_frame_to_u32(frame: PhysFrame) -> u32 {
+    let key = frame.start_address().as_u64() >> RS_ALIGN_4KIB;
+
+    assert!(key <= u32::MAX as u64);
+
+    key as u32
+}
+
+#[inline(always)]
+fn u32_to_phys_frame(key: u32) -> PhysFrame {
+    PhysFrame::containing_address(PhysAddr::new((key as u64) << RS_ALIGN_4KIB))
 }
 
 // ! 工具函数

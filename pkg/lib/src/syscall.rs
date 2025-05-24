@@ -1,6 +1,8 @@
 use core::fmt;
 use alloc::format;
 use syscall_def::Syscall;
+use chrono::{DateTime, FixedOffset, NaiveDateTime};
+
 // fmt
 
 
@@ -32,6 +34,21 @@ pub fn sys_read(fd: u8, buf: &mut [u8]) -> Option<usize> {
     } else {
         Some(ret as usize)
     }
+}
+
+#[inline(always)]
+pub fn sys_time() -> NaiveDateTime {
+    let time = syscall!(Syscall::GetTime) as i64;
+    const BILLION: i64 = 1_000_000_000;
+    NaiveDateTime::from_timestamp(time / BILLION, (time % BILLION) as u32)
+}
+#[inline(always)]
+pub fn sys_time_beijing() -> DateTime<FixedOffset> {
+    let time = syscall!(Syscall::GetTime) as i64;
+    const BILLION: i64 = 1_000_000_000;
+    let utc_dt = NaiveDateTime::from_timestamp(time / BILLION, (time % BILLION) as u32);
+    let beijing_offset = FixedOffset::east_opt(8 * 3600).unwrap(); // 东八区偏移量
+    DateTime::from_utc(utc_dt, beijing_offset)
 }
 
 #[inline(always)]
@@ -80,4 +97,9 @@ pub fn sys_exit(code: isize) -> ! {
     sys_write(1, s.as_bytes());
     syscall!(Syscall::Exit, code as u64);
     unreachable!("This process should be terminated by now.")
+}
+
+#[inline(always)]
+pub fn sys_get_time() -> usize {
+    syscall!(Syscall::GetTime) as usize
 }

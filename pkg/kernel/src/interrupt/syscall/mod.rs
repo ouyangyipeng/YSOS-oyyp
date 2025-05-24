@@ -62,6 +62,11 @@ pub fn dispatcher(context: &mut ProcessContext) {
             context.set_rax(sys_write(&args));
         },
 
+        // None -> time: u64
+        Syscall::GetTime => { /* FIXME: get current time */
+            context.set_rax(sys_gettime());
+        },
+
         // None -> pid: u16
         Syscall::GetPid => { /* FIXME: get current pid */ 
             context.set_rax(sys_getpid());

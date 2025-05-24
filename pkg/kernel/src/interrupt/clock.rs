@@ -1,73 +1,108 @@
-// use crate::{memory::*, proc::ProcessContext};
-// use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
-
-// use core::sync::atomic::{AtomicU64, Ordering};
-
+// use super::consts::*;
+// use x86_64::structures::idt::{InterruptDescriptorTable,InterruptStackFrame};
+// use crate::proc;
+// use crate::{memory::gdt, proc::ProcessContext};
+// // BootInfo,UefiRuntime,
+// use core::sync::atomic::AtomicU64;
+// use crate::guard_access_fn;
+// use boot::{BootInfo,*};
+// use uefi::runtime::{Time,*};
+// use chrono::naive::{NaiveDate, NaiveDateTime};
 // use super::consts::*;
 
+
 // pub unsafe fn register_idt(idt: &mut InterruptDescriptorTable) {
-//     idt[Interrupts::IrqBase as u8 + Irq::Timer as u8]
+//     unsafe{idt[Interrupts::IrqBase as u8 + Irq::Timer as u8]
 //         .set_handler_fn(clock_handler)
-//         .set_stack_index(gdt::TIMER_IST_INDEX);
-//     trace!("Clock Interrupt Handler Registered.");
+//         .set_stack_index(gdt::CLOCK_IST_INDEX);}
 // }
 
-// pub extern "x86-interrupt" fn clock (mut context: ProcessContext) {
+// pub extern "C" fn clock(mut context: proc::ProcessContext){
+    
 //     x86_64::instructions::interrupts::without_interrupts(|| {
-//         if inc_counter() % 0x10000 == 0 {
-//             crate::proc::switch(&mut context);
-//             info!("Clock Interrupt: {:?}", context);
-//         }
-        
+//         proc::switch(&mut context);
 //         super::ack();
 //     });
 // }
+
 // as_handler!(clock);
-        
 
-// // pub extern "x86-interrupt" fn clock_handler(_sf: InterruptStackFrame) {
-// //     x86_64::instructions::interrupts::without_interrupts(|| {
-// //         if inc_counter() % 0x1000 == 0 {
-// //             trace!("Tick! @{}", read_counter());
-// //             // info!("Tick! @{}", read_counter());
-// //         }
-// //         super::ack();
-// //     });
-// // }
-
-
-// static COUNTER: AtomicU64 = AtomicU64::new(1);
-
-// #[inline]
-// pub fn read_counter() -> u64 {
-//     // FIXME: load counter value
-//     COUNTER.load(Ordering::Relaxed)// 时间戳不需要严格顺序
+// pub fn get_time() -> Time {
+//     let ret = uefi::runtime::get_time().unwrap();
+//     ret
 // }
-
-// #[inline]
-// pub fn inc_counter() -> u64 {
-//     // FIXME: read counter value and increase it
-//     COUNTER.fetch_add(1, Ordering::SeqCst)// 必须使用SeqCst保证全局可见性
-// }
-
 
 use super::consts::*;
-use x86_64::structures::idt::{InterruptDescriptorTable,InterruptStackFrame};
+use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 use crate::proc;
-use crate::memory::gdt;
+use crate::{memory::gdt, proc::ProcessContext};
+use core::sync::atomic::AtomicU64;
+use crate::guard_access_fn;
+use boot::{BootInfo, *};
+use uefi::runtime::{Time, *};
+use chrono::{NaiveDateTime, Datelike, Timelike};
+use chrono::naive::NaiveDate;
+use chrono::Duration;
+
+pub static SYSTEM_TIME: AtomicU64 = AtomicU64::new(0);
 
 pub unsafe fn register_idt(idt: &mut InterruptDescriptorTable) {
-    unsafe{idt[Interrupts::IrqBase as u8 + Irq::Timer as u8]
-        .set_handler_fn(clock_handler)
-        .set_stack_index(gdt::CLOCK_IST_INDEX);}
+    unsafe {
+        idt[Interrupts::IrqBase as u8 + Irq::Timer as u8]
+            .set_handler_fn(clock_handler)
+            .set_stack_index(gdt::CLOCK_IST_INDEX);
+    }
 }
 
-pub extern "C" fn clock(mut context: proc::ProcessContext){
-    
+pub extern "C" fn clock(mut context: proc::ProcessContext) {
     x86_64::instructions::interrupts::without_interrupts(|| {
+        // 更新系统时间计数器
+        SYSTEM_TIME.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
         proc::switch(&mut context);
         super::ack();
     });
 }
 
 as_handler!(clock);
+
+/// 获取 UEFI 系统时间
+pub fn get_uefi_time() -> Time {
+    uefi::runtime::get_time().expect("Failed to get UEFI time")
+}
+
+/// 将 UEFI Time 转换为 NaiveDateTime
+pub fn time_to_datetime(time: Time) -> NaiveDateTime {
+    NaiveDate::from_ymd(
+        time.year() as i32,
+        time.month() as u32,
+        time.day() as u32
+    ).and_hms_nano(
+        time.hour() as u32,
+        time.minute() as u32,
+        time.second() as u32,
+        time.nanosecond() as u32
+    )
+}
+
+/// 获取当前系统时间（从启动开始的毫秒数）
+pub fn sys_time() -> Duration {
+    let ticks = SYSTEM_TIME.load(core::sync::atomic::Ordering::Relaxed);
+    // 假设时钟中断频率是 1000Hz，每个 tick 是 1ms
+    Duration::milliseconds(ticks as i64)
+}
+
+/// 获取当前日期时间
+pub fn current_datetime() -> NaiveDateTime {
+    time_to_datetime(get_uefi_time())
+}
+
+/// Sleep 函数实现
+pub fn sleep(millisecs: i64) {
+    let start = sys_time();
+    let dur = Duration::milliseconds(millisecs);
+    
+    while sys_time() - start < dur {
+        // 让出 CPU 时间片
+        // crate::proc::yield_now();
+    }
+}

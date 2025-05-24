@@ -6,6 +6,8 @@ use lib::*;
 // use alloc::string::{String, ToString};
 // Vec
 use alloc::vec::Vec;
+use chrono::{DateTime, FixedOffset, NaiveDateTime};
+use chrono::Timelike;
 
 mod mylib;
 use mylib::*;
@@ -48,7 +50,11 @@ fn main() -> isize {
                 help();
             }
             "clock" => {
-                println!("The current clock counter value is {}", format_time(counter));
+                // println!("The current clock counter value is {}", format_time(counter));
+                // println!(
+                let beijing_time = sys_time_beijing();
+                // println!("当前时间: {}", beijing_time.format("%H:%M:%S")); // 例如: 15:30:45
+                println!("时分秒: {:02}:{:02}:{:02}", beijing_time.hour(), beijing_time.minute(), beijing_time.second());
             }
             "echo" => {
                 let message = command.collect::<Vec<&str>>().join(" ");

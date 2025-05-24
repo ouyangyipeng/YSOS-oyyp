@@ -31,7 +31,7 @@ pub fn spawn_init() -> proc::ProcessId {
     // proc::list_app();
     info!("Spawn init process");
     // proc::spawn("hello").unwrap()
-    proc::spawn("hello").unwrap()
+    proc::spawn("sh").unwrap()
 }
 
 

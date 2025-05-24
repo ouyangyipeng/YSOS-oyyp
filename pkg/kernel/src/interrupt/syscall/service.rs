@@ -1,4 +1,5 @@
 use core::alloc::Layout;
+use crate::interrupt::clock::current_datetime;
 use crate::proc;
 use crate::proc::*;
 use crate::utils;
@@ -46,6 +47,12 @@ pub fn sys_read(args: &SyscallArgs) -> usize {
     };
     let ret = proc::read(args.arg0 as u8, buf) as usize;
     ret
+}
+
+pub fn sys_gettime() -> usize {
+    let time = current_datetime().and_utc().timestamp_nanos_opt().unwrap_or(0);
+    // let ret = utils::time_to_unix(&time);
+    time as usize
 }
 
 pub fn sys_getpid() -> usize {
