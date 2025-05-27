@@ -103,3 +103,8 @@ pub fn sys_exit(code: isize) -> ! {
 pub fn sys_get_time() -> usize {
     syscall!(Syscall::GetTime) as usize
 }
+
+#[inline(always)]
+pub fn sys_fork() -> u16 {
+    syscall!(Syscall::Fork) as u16
+}

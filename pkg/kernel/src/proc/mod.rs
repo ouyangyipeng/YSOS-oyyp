@@ -308,3 +308,21 @@ pub fn still_alive(pid: ProcessId) -> bool {
         }
     })
 }
+
+pub fn fork(context: &mut ProcessContext) {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        let manager = get_process_manager();
+        // FIXME: save_current as parent
+        // let parent = Arc::downgrade(&manager.current());
+        let parent_pid = manager.current().pid();
+        manager.save_current(context);
+        // FIXME: fork to get child
+        // let child = manager.fork();
+        manager.fork();
+        // FIXME: push to child & parent to ready queue
+        // manager.push_ready(child); // 这里不用吧？
+        manager.push_ready(parent_pid);
+        // FIXME: switch to next process
+        manager.switch_next(context);
+    })
+}

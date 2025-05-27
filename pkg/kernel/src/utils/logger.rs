@@ -1,6 +1,21 @@
 use log::{Level, LevelFilter, Metadata, Record};
 use crate::drivers::serial::get_serial_for_sure;
 use core::fmt::Write;
+// use x86::io::{outb, inb};
+use alloc::format;
+
+// // 假设x86架构CMOS RTC
+// unsafe fn read_rtc_seconds() -> u8 {
+//     outb(0x70, 0x00); // 选择秒寄存器
+//     inb(0x71)
+// }
+
+// // BCD转十进制
+// fn bcd_to_dec(bcd: u8) -> u8 {
+//     (bcd >> 4) * 10 + (bcd & 0x0F)
+// }
+
+
 
 pub fn init() {
     static LOGGER: Logger = Logger;
@@ -20,6 +35,9 @@ pub fn init() {
 
 struct Logger;
 
+// 实现一个计数，每一个log都增加一次
+// static mut timestamp: usize = 0;
+
 impl log::Log for Logger {
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= log::max_level()
@@ -28,9 +46,14 @@ impl log::Log for Logger {
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             let mut serial = get_serial_for_sure();
+            // 在Logger中调用
+            // let seconds = unsafe { bcd_to_dec(read_rtc_seconds()) };
+            // let timestamp = format!("\x1b[37m00:00:{:02}\x1b[0m", seconds).as_str();
             
             // 时间戳（假设你有一个适合 no_std 的时间库）
-            let timestamp = "00:00:00"; // 替换为实际的时间戳逻辑
+            let timestamp = 0; // 替换为实际的时间戳逻辑
+            // unsafe{timestamp += 1;}
+            // let num = unsafe{timestamp};
             
             // 模块名
             let module = record.module_path().unwrap_or("unknown");
@@ -64,11 +87,14 @@ impl log::Log for Logger {
             let line = record.line().unwrap_or(0);
 
             // 组合日志格式
+            // unsafe{
             let _ = write!(
                 serial,
                 "\x1b[37m[{}]\x1b[0m \x1b[35m[{}]\x1b[0m {} {} - {}:{}", 
+                // num, module, symbol, level_name, file, line
                 timestamp, module, symbol, level_name, file, line
             );
+            // }
             let _ = serial.write_fmt(*record.args());
             let _ = serial.write_str("\n\r");
         }

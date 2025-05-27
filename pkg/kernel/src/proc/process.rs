@@ -1,3 +1,4 @@
+use super::vm::stack::STACK_MAX_PAGES;
 use super::*;
 use crate::memory::*;
 use crate::proc::vm::ProcessVm;
@@ -92,9 +93,38 @@ impl Process {
         inner.kill(self.pid, ret);
     }
 
-    pub fn alloc_init_stack(&self) -> VirtAddr {
-        // info!("Allocating init stack for process");
-        self.write().vm_mut().init_proc_stack(self.pid)
+    // pub fn alloc_init_stack(&self) -> VirtAddr {
+    //     // info!("Allocating init stack for process");
+    //     self.write().vm_mut().init_proc_stack(self.pid)
+    // }
+
+    pub fn fork(self: &Arc<Self>) -> Arc<Self> {
+        // FIXME: lock inner as write
+        let mut inner = self.inner.write();
+        // FIXME: inner fork with parent weak ref
+        let parent = Arc::downgrade(self);
+        // 先创建新进程child的pid
+        let child_pid = ProcessId::new();
+        let child_inner = inner.fork(parent);
+
+        // FOR DBG: maybe print the child process info
+        //          e.g. parent, name, pid, etc.
+        info!("Forking process: parent={}, child={}, name={}", inner.name(), child_pid, child_inner.name());
+
+        // FIXME: make the arc of child
+        let child = Arc::new(Process{ // 使用self不使用process的原因是“紫禁城（doge”要直接创造一个新的进程
+            pid: child_pid,
+            inner: Arc::new(RwLock::new(child_inner)),
+        });// 这里用强Arc对吗？
+        // FIXME: add child to current process's children list
+        inner.children.push(child.clone());
+        // FIXME: set fork ret value for parent with `context.set_rax`
+        inner.context.set_rax(child_pid.0 as usize);
+        // FIXME: mark the child as ready & return it
+        // inner.pause(); // 不是哥们 这里应该要把父进程的状态改成ready吧？
+        // child.write().pause(); // 这样？
+        child.inner.write().pause(); // 这样？
+        child
     }
 }
 
@@ -217,13 +247,10 @@ impl ProcessInner {
     // fn clean_stack(&mut self, pid: ProcessId) {
     //     let page_table = self.page_table.take().unwrap();
     //     let mut mapper = page_table.mapper();
-
     //     let frame_deallocator = &mut *get_frame_alloc_for_sure();
     //     let start_count = frame_deallocator.recycled_count();
-
     //     let proc_data = self.proc_data.as_mut().unwrap();
     //     let stack = proc_data.stack_segment.unwrap();
-
     //     trace!(
     //         "Free stack for {}#{}: [{:#x} -> {:#x}) ({} frames)",
     //         self.name,
@@ -232,7 +259,6 @@ impl ProcessInner {
     //         stack.end.start_address(),
     //         stack.count()
     //     );
-
     //     elf::unmap_range(
     //         stack.start.start_address().as_u64(),
     //         stack.count() as u64,
@@ -241,13 +267,13 @@ impl ProcessInner {
     //         true,
     //     )
     //     .unwrap();
-
     // }
 
     /// elf的load elf
     // pub fn load_elf(&mut self, elf: &ElfFile) {
     //     self.vm_mut().load_elf(elf);
     // }
+
     pub fn load_elf(&mut self , elf: &ElfFile){
         // let mut code_pages = 0;
         // let mut code_start = None;
@@ -270,6 +296,62 @@ impl ProcessInner {
         //     self.data_mut().code_start = start;
         // }
         self.vm_mut().load_elf(elf)
+    }
+
+    pub fn fork(&mut self, parent: Weak<Process>) -> ProcessInner {
+        // FIXME: fork the process virtual memory struct
+        // 这个应该是要后算的？因为fork里面有个stack_offset_count啊
+        // FIXME: calculate the real stack offset
+        // 以上两个写一起，暂时认为顺序应该是反过来的。
+        // 这里的逻辑应该是，按照文档的图，总子进程个数n，那就是0x400000000000-(n+1)*0x100000000？
+        let child_count = self.children.len() as u64;
+        // let stack_offset_count = (child_count + 1) * 0x100000000;//这不对，应该是页数
+        let stack_offset_count = (child_count + 1) * STACK_MAX_PAGES;
+        let child_vm = self //克隆父进程的虚拟内存空间
+            .proc_vm
+            .as_ref()
+            .unwrap()
+            .fork(stack_offset_count);
+
+        // FIXME: update `rsp` in interrupt stack frame
+        // rsp是中断栈帧的返回地址，先克隆上下文的寄存器状态
+        let mut child_context = self.context.clone();
+        // 然后计算新的栈顶地址，因为在vm的fork（其实是stack的fork）里面我们尝试分配新的栈空间
+        // 高32位用进程新栈基地址的高32位，低32位使用原栈顶地址的低32位（保留栈偏移量）
+        let child_stack_start_addr = child_vm.stack.range.start.start_address().as_u64();
+        let high32 = !0xFFFFFFFF & child_stack_start_addr;
+        let parent_stack_top = self.context.value.stack_frame.stack_pointer.as_u64();
+        let low32 = parent_stack_top & 0xFFFFFFFF;
+        let new_rsp = high32 | low32;
+        let child_stack_top = VirtAddr::new(new_rsp);
+        // 然后设置新的栈顶地址
+        child_context.value.stack_frame.stack_pointer = child_stack_top;
+        // 这样在返回的时候，子进程就可以从新的栈顶地址开始找
+        // FIXME: set the return value 0 for child with `context.set_rax`
+        child_context.set_rax(0);
+        // FIXME: clone the process data struct
+        let child_proc_data = self
+            .proc_data
+            .as_ref()
+            .unwrap()
+            .clone(); // 这里是深拷贝
+        // FIXME: construct the child process inner
+        // 我们克隆父进程的名字后加一个child再加上当前序号，也就是children.len() + 1
+        let child_name = self.name.clone() + "-child" + &(self.children.len() + 1).to_string();
+        let child_inner = ProcessInner {
+            name: child_name,
+            parent: Some(parent),
+            children: Vec::new(),
+            ticks_passed: 0,
+            status: ProgramStatus::Ready,
+            context: child_context,
+            exit_code: None,
+            proc_data: Some(child_proc_data),
+            proc_vm: Some(child_vm),
+        };
+
+        // NOTE: return inner because there's no pid record in inner
+        child_inner
     }
 }
 

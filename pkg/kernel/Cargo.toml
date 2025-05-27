@@ -25,3 +25,5 @@ xmas-elf = { workspace = true }
 syscall_def = { workspace = true }
 chrono = { workspace = true }
 mu_uefi_runtime_services = "2.0.0"
+lib = { workspace = true }
+embedded-time = { workspace = true }

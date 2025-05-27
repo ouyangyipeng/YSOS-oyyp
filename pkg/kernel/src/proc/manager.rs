@@ -42,6 +42,7 @@ pub struct ProcessManager {
     processes: RwLock<BTreeMap<ProcessId, Arc<Process>>>,
     ready_queue: Mutex<VecDeque<ProcessId>>,
     app_list: boot::AppListRef,
+    wait_queue: Mutex<BTreeMap<ProcessId, BTreeSet<ProcessId>>>,
 }
 
 impl ProcessManager {
@@ -57,6 +58,7 @@ impl ProcessManager {
             processes: RwLock::new(processes),
             ready_queue: Mutex::new(ready_queue),
             app_list: app_list,
+            wait_queue: Mutex::new(BTreeMap::new()),
         }
     }
 
@@ -177,23 +179,17 @@ impl ProcessManager {
     //     let page_table = kproc.read().clone_page_table();
     //     let proc_vm = Some(ProcessVm::new(page_table));
     //     let proc = Process::new(name, Some(Arc::downgrade(&kproc)), proc_vm, proc_data);
-
     //     let pid = proc.pid();
-
     //     // alloc stack for the new process base on pid
     //     let stack_top = proc.alloc_init_stack();
-
     //     // FIXME: set the stack frame
     //     proc.write().init_stack_frame(entry, stack_top);
-
     //     // FIXME: add to process map
     //     self.add_proc(pid, proc);
     //     trace!("Spawn process #{}", pid);
-
     //     // FIXME: push to ready queue
     //     self.push_ready(pid);
     //     trace!("Push process #{} to ready queue", pid);
-
     //     // FIXME: return new process pid
     //     info!("Spawn process #{} with stack top {:#x}", pid, stack_top);
     //     pid
@@ -350,6 +346,25 @@ impl ProcessManager {
         output += &processor::print_processors();
 
         print!("{}", output);
+    }
+
+    pub fn fork(&self) {
+        // FIXME: get current process
+        let current = self.current();
+
+        // FIXME: fork to get child
+        let child = current.fork();
+
+        // FIXME: add child to process list
+        // self.add_proc(child.pid(), child);
+        // self.push_ready(child.pid()); // 换到这里来  // 不是，为啥这样会报错啊？好像是被借走了
+        let child_pid = child.pid();
+        self.add_proc(child_pid, child);
+        self.push_ready(child_pid); // 这样又可以了？
+        
+
+        // FOR DBG: maybe print the process ready queue?
+        info!("Process ready queue: {:#?}", self.ready_queue.lock());
     }
 }
 

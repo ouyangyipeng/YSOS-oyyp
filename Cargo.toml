@@ -47,6 +47,7 @@ lazy_static = { version = "1.4", features = ["spin_no_std"] }
 micromath = { version = "2.0", features = ["num-traits"] }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 crossbeam-queue = { version = "0.3", default-features = false, features = ["alloc"] }
+embedded-time = { version = "0.12", default-features = false}
 
 # myself add
 compiler_builtins = "0.1.152"
