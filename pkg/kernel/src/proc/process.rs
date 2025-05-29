@@ -157,6 +157,10 @@ impl ProcessInner {
         self.status = ProgramStatus::Running;
     }
 
+    pub fn block(&mut self) {
+        self.status = ProgramStatus::Blocked;
+    }
+
     pub fn exit_code(&self) -> Option<isize> {
         self.exit_code
     }
@@ -352,6 +356,10 @@ impl ProcessInner {
 
         // NOTE: return inner because there's no pid record in inner
         child_inner
+    }
+
+    pub fn set_rax(&mut self, value: usize) {
+        self.context.set_rax(value);
     }
 }
 

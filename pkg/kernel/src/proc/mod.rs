@@ -253,47 +253,60 @@ pub fn exit(mut ret: isize, context: &mut ProcessContext) {
 
 pub fn wait_process(pid: ProcessId, context: &mut ProcessContext){
     x86_64::instructions::interrupts::without_interrupts(|| {
-        let proc = get_process_manager().get_proc(&pid).unwrap();
-        // if !still_alive(pid) {
-        //     let exit_code = proc.read().exit_code().unwrap();
-        //     context.set_rax(exit_code as usize); 
-        //     info!("Process {} exited with code {}", pid, exit_code);
-        //     get_process_manager().save_current(context);
-        //     get_process_manager().switch_next(context);
-        // }
-        info!("now proc: {}", proc.read().name());
-        if let Some(ret) = proc.read().exit_code() {
+        let manager = get_process_manager();
+        if let Some(ret) = manager.get_exit_code(pid) {
             context.set_rax(ret as usize);
-            info!("Process {} exited with code {}", pid, ret);
-            info!("now proc: {}", proc.read().name());
-            get_process_manager().save_current(context);
-            get_process_manager().switch_next(context);
-        } else if pid == KERNEL_PID {
-            // kernel process
-            context.set_rax(0);
-            info!("Kernel process {}", pid);
-        } else if proc.read().status() == ProgramStatus::Dead {
-            // process is dead
-            context.set_rax(0);
-            info!("Process {} is dead", pid);
-
         } else {
-            // process is still alive
-            // info!("Process {} is still alive", pid);
-            // super::wait(pid);
-            // info!("Process {} has exited", pid);
-            // let exit_code = proc.read().exit_code().unwrap();
-            // context.set_rax(exit_code as usize);
-            // info!("Process {} exited with code {}", pid, exit_code);
-            // info!("now proc: {}", proc.read().name());
-            // get_process_manager().save_current(context);
-            // info!("now proc: {}", proc.read().name());
-            // get_process_manager().switch_next(context);
-            // info!("Process {} switched", get_process_manager().current().read().name());
-            context.set_rax(2333);
+            manager.wait_pid(pid);
+            manager.save_current(context);
+            manager.current().write().block();
+            manager.switch_next(context);
         }
     })
 }
+
+// pub fn wait_process(pid: ProcessId, context: &mut ProcessContext){
+//     x86_64::instructions::interrupts::without_interrupts(|| {
+//         let proc = get_process_manager().get_proc(&pid).unwrap();
+//         // if !still_alive(pid) {
+//         //     let exit_code = proc.read().exit_code().unwrap();
+//         //     context.set_rax(exit_code as usize); 
+//         //     info!("Process {} exited with code {}", pid, exit_code);
+//         //     get_process_manager().save_current(context);
+//         //     get_process_manager().switch_next(context);
+//         // }
+//         info!("now proc: {}", proc.read().name());
+//         if let Some(ret) = proc.read().exit_code() {
+//             context.set_rax(ret as usize);
+//             info!("Process {} exited with code {}", pid, ret);
+//             info!("now proc: {}", proc.read().name());
+//             get_process_manager().save_current(context);
+//             get_process_manager().switch_next(context);
+//         } else if pid == KERNEL_PID {
+//             // kernel process
+//             context.set_rax(0);
+//             info!("Kernel process {}", pid);
+//         } else if proc.read().status() == ProgramStatus::Dead {
+//             // process is dead
+//             context.set_rax(0);
+//             info!("Process {} is dead", pid);
+//         } else {
+//             // process is still alive
+//             // info!("Process {} is still alive", pid);
+//             // super::wait(pid);
+//             // info!("Process {} has exited", pid);
+//             // let exit_code = proc.read().exit_code().unwrap();
+//             // context.set_rax(exit_code as usize);
+//             // info!("Process {} exited with code {}", pid, exit_code);
+//             // info!("now proc: {}", proc.read().name());
+//             // get_process_manager().save_current(context);
+//             // info!("now proc: {}", proc.read().name());
+//             // get_process_manager().switch_next(context);
+//             // info!("Process {} switched", get_process_manager().current().read().name());
+//             context.set_rax(2333);
+//         }
+//     })
+// }
 
 #[inline]
 pub fn still_alive(pid: ProcessId) -> bool {

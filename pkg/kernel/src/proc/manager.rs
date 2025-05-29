@@ -319,6 +319,12 @@ impl ProcessManager {
         trace!("Kill {:#?}", &proc);
 
         proc.kill(ret);
+
+        if let Some(pids) = self.wait_queue.lock().remove(&pid) {
+            for pid in pids {
+                self.wake_up(pid, Some(ret));
+            }
+        }
     }
 
     pub fn print_process_list(&self) {
@@ -365,6 +371,54 @@ impl ProcessManager {
 
         // FOR DBG: maybe print the process ready queue?
         info!("Process ready queue: {:#?}", self.ready_queue.lock());
+    }
+
+    /// Block the process with the given pid
+    pub fn block(&self, pid: ProcessId) {
+        if let Some(proc) = self.get_proc(&pid) {
+            // FIXME: set the process as blocked
+            proc.write().block();
+        }
+    }
+
+    pub fn get_exit_code(&self, pid: ProcessId) -> Option<isize> {
+        if let Some(proc) = self.get_proc(&pid) {
+            if proc.read().status() == ProgramStatus::Dead {
+                return proc.read().exit_code();
+            }
+        }
+        None
+    }
+
+    pub fn wait_pid(&self, pid: ProcessId) {
+        let mut wait_queue = self.wait_queue.lock();
+        // FIXME: push the current process to the wait queue
+        //        `processor::get_pid()` is waiting for `pid`
+        // 这里要先获得这个btreemap的锁，然后里面的键值是传入的这个pid
+        // 而它的btreeset里面要放进我们当前的这个process的pid
+        let entry_set_of_pid = wait_queue
+            .entry(pid)
+            .or_insert_with(BTreeSet::new);
+        entry_set_of_pid.insert(processor::get_pid());
+        drop(wait_queue); // 释放锁
+    }
+
+    /// Wake up the process with the given pid
+    ///
+    /// If `ret` is `Some`, set the return value of the process
+    pub fn wake_up(&self, pid: ProcessId, ret: Option<isize>) {
+        if let Some(proc) = self.get_proc(&pid) {
+            let mut inner = proc.write();
+            if let Some(ret) = ret {
+                // FIXME: set the return value of the process
+                //        like `context.set_rax(ret as usize)`
+                inner.set_rax(ret as usize);
+            }
+            // FIXME: set the process as ready
+            inner.pause();
+            // FIXME: push to ready queue
+            self.push_ready(pid);
+        }
     }
 }
 
