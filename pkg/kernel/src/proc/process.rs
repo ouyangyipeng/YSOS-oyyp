@@ -109,7 +109,7 @@ impl Process {
 
         // FOR DBG: maybe print the child process info
         //          e.g. parent, name, pid, etc.
-        info!("Forking process: parent={}, child={}, name={}", inner.name(), child_pid, child_inner.name());
+        debug!("Forking process: parent={}, child={}, name={}", inner.name(), child_pid, child_inner.name());
 
         // FIXME: make the arc of child
         let child = Arc::new(Process{ // 使用self不使用process的原因是“紫禁城（doge”要直接创造一个新的进程
@@ -360,6 +360,23 @@ impl ProcessInner {
 
     pub fn set_rax(&mut self, value: usize) {
         self.context.set_rax(value);
+    }
+
+    pub fn sem_new(&mut self, key: u32, val: usize) -> bool {
+        info!("Creating new semaphore with key: {}, value: {}", key, val);
+        self.data_mut().sem_new(key, val)
+    }
+
+    pub fn sem_remove(&mut self, key: u32) -> bool {
+        self.data_mut().sem_remove(key)
+    }
+
+    pub fn sem_wait(&mut self, key: u32, pid: ProcessId) -> SemaphoreResult {
+        self.data_mut().sem_wait(key, pid)
+    }
+    
+    pub fn sem_signal(&mut self, key: u32) -> SemaphoreResult {
+        self.data_mut().sem_signal(key)
     }
 }
 

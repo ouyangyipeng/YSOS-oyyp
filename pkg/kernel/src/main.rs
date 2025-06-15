@@ -29,13 +29,13 @@ pub fn spawn_init() -> proc::ProcessId {
     // print!("\x1b[1;1H\x1b[2J");
 
     // proc::list_app();
-    info!("Spawn init process");
+    debug!("Spawn init process");
     // proc::spawn("hello").unwrap()
     proc::spawn("sh").unwrap()
 }
 
 
-// ! 以下整个是lab2-3的shell
+// ! 以下整个是lab2-3的shell 目前shell移植到app的sh
 
 // pub fn kernel_main(boot_info: &'static boot::BootInfo) -> ! {
 //     ysos::init(boot_info);
@@ -137,38 +137,38 @@ pub fn spawn_init() -> proc::ProcessId {
 //     ysos::shutdown();
 // }
 
-fn format_time(seconds: u64) -> String {
-    let hours = seconds / 3600;
-    let minutes = (seconds % 3600) / 60;
-    let secs = seconds % 60;
-    format!("{:02}:{:02}:{:02}", hours, minutes, secs)
-}
+// fn format_time(seconds: u64) -> String {
+//     let hours = seconds / 3600;
+//     let minutes = (seconds % 3600) / 60;
+//     let secs = seconds % 60;
+//     format!("{:02}:{:02}:{:02}", hours, minutes, secs)
+// }
 
-fn format_prompt(counter: u64) {
-    // 获取终端宽度，需要以后实现终端尺寸查询
-    // 这里还有很多内容比如文件系统什么的，都后面再实现，先做了个样子
-    let term_width: i32 = 80; // 默认值80
+// fn format_prompt(counter: u64) {
+//     // 获取终端宽度，需要以后实现终端尺寸查询
+//     // 这里还有很多内容比如文件系统什么的，都后面再实现，先做了个样子
+//     let term_width: i32 = 80; // 默认值80
     
-    // 左侧部分
-    let left = format!(
-        "╭─\x1b[34m░▒▓\x1b[44m\x1b[37m /work/OYOS\x1b[43m\x1b[30m main !5 \x1b[33m\x1b[40m"
-    );
+//     // 左侧部分
+//     let left = format!(
+//         "╭─\x1b[34m░▒▓\x1b[44m\x1b[37m /work/OYOS\x1b[43m\x1b[30m main !5 \x1b[33m\x1b[40m"
+//     );
     
-    // 右侧部分
-    let right = format!(
-        "\x1b[30m\x1b[40m\x1b[31m 😄✅ │ root@Owen \x1b[47m\x1b[30m{} \x1b[37m\x1b[40m▓▒░\x1b[0m─╮",
-        format_time(counter)
-    );
-    // 🤬❌
-    // 🤔⚠️
+//     // 右侧部分
+//     let right = format!(
+//         "\x1b[30m\x1b[40m\x1b[31m 😄✅ │ root@Owen \x1b[47m\x1b[30m{} \x1b[37m\x1b[40m▓▒░\x1b[0m─╮",
+//         format_time(counter)
+//     );
+//     // 🤬❌
+//     // 🤔⚠️
     
-    // 计算填充宽度
-    let left_len: i32 = 22; // 实际显示字符数
-    let right_len: i32 = 25; // 实际显示字符数
-    let fill_width: i32 = term_width.saturating_sub(left_len + right_len);
+//     // 计算填充宽度
+//     let left_len: i32 = 22; // 实际显示字符数
+//     let right_len: i32 = 25; // 实际显示字符数
+//     let fill_width: i32 = term_width.saturating_sub(left_len + right_len);
     
-    print!(
-        "{}\x1b[0m{:─<width$}{}\x1b[0m",
-        left, "", right, width = fill_width as usize
-    );
-}
+//     print!(
+//         "{}\x1b[0m{:─<width$}{}\x1b[0m",
+//         left, "", right, width = fill_width as usize
+//     );
+// }

@@ -72,6 +72,12 @@ pub fn dispatcher(context: &mut ProcessContext) {
             context.set_rax(sys_getpid());
         },
 
+        // op: u8, key: u32, val: usize -> ret: any
+        Syscall::Sem => {
+            // info!("Syscall::Sem: {:?}", args);
+            sys_sem(&args, context);
+        },
+
         // None -> pid: u16 or 0 or -1
         Syscall::Fork => {
             sys_fork(context);

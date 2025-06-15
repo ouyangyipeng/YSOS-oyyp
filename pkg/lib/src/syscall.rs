@@ -56,8 +56,8 @@ pub fn sys_wait_pid(pid: u16) -> isize {
     // FIXME: try to get the return value for process
     //        loop until the process is finished
     let ret = syscall!(Syscall::WaitPid, pid as u64) as isize;
-    let s =format!("Process {} exited with code {}", pid, ret);
-    sys_write(1, s.as_bytes());
+    // let s =format!("Process {} exited with code {}", pid, ret);
+    // sys_write(1, s.as_bytes());
     ret
 }
 
@@ -93,8 +93,8 @@ pub fn sys_get_pid() -> u16 {
 
 #[inline(always)]
 pub fn sys_exit(code: isize) -> ! {
-    let s = format!("Process exited with code {}", code);
-    sys_write(1, s.as_bytes());
+    // let s = format!("Process exited with code {}\n", code);
+    // sys_write(1, s.as_bytes());
     syscall!(Syscall::Exit, code as u64);
     unreachable!("This process should be terminated by now.")
 }
@@ -107,4 +107,24 @@ pub fn sys_get_time() -> usize {
 #[inline(always)]
 pub fn sys_fork() -> u16 {
     syscall!(Syscall::Fork) as u16
+}
+
+#[inline(always)]
+pub fn sys_new_sem(key: u32, value: usize) -> bool {
+    syscall!(Syscall::Sem, 0, key as u64, value as u64) != 0
+}
+
+#[inline(always)]
+pub fn sys_remove_sem(key: u32) -> bool {
+    syscall!(Syscall::Sem, 1, key as usize) != 0
+}
+
+#[inline(always)]
+pub fn sys_signal_sem(key: u32) -> bool {
+    syscall!(Syscall::Sem, 2, key as usize) != 0
+}
+
+#[inline(always)]
+pub fn sys_wait_sem(key: u32) -> bool {
+    syscall!(Syscall::Sem, 3, key as usize) != 0
 }

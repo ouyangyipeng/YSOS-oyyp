@@ -43,17 +43,15 @@ impl Semaphore {
     pub fn wait(&mut self, pid: ProcessId) -> SemaphoreResult {
         // FIXME: if the count is 0, then push pid into the wait queue
         //          return Block(pid)
+        if self.count == 0 {         // 资源不足
+            self.wait_queue.push_back(pid); // 加入等待队列
+            SemaphoreResult::Block(pid) // 通知调度器阻塞该进程
+        } else {
         // FIXME: else decrease the count and return Ok
+            self.count -= 1;        // 消耗资源
+            SemaphoreResult::Ok
+        }
     }
-    // pub fn wait(&mut self, pid: ProcessId) -> SemaphoreResult {
-    //     if self.count == 0 {         // 资源不足
-    //         self.wait_queue.push_back(pid); // 加入等待队列
-    //         SemaphoreResult::Block(pid) // 通知调度器阻塞该进程
-    //     } else {
-    //         self.count -= 1;        // 消耗资源
-    //         SemaphoreResult::Ok
-    //     }
-    // }
 
     /// Signal the semaphore (release/up/verhogen)
     ///
@@ -63,16 +61,14 @@ impl Semaphore {
         // FIXME: if the wait queue is not empty
         //          pop a process from the wait queue
         //          return WakeUp(pid)
+        if let Some(pid) = self.wait_queue.pop_front() { // 有等待进程
+            SemaphoreResult::WakeUp(pid) // 通知唤醒队首进程
+        } else {
         // FIXME: else increase the count and return Ok
+            self.count += 1;        // 无等待者则增加资源
+            SemaphoreResult::Ok
+        }
     }
-    // pub fn signal(&mut self) -> SemaphoreResult {
-    //     if let Some(pid) = self.wait_queue.pop_front() { // 有等待进程
-    //         SemaphoreResult::WakeUp(pid) // 通知唤醒队首进程
-    //     } else {
-    //         self.count += 1;        // 无等待者则增加资源
-    //         SemaphoreResult::Ok
-    //     }
-    // }
 }
 
 #[derive(Debug, Default)]
@@ -81,14 +77,24 @@ pub struct SemaphoreSet {
 }
 
 impl SemaphoreSet {
+    // pub fn insert(&mut self, key: u32, value: usize) -> bool {
+    //     trace!("Sem Insert: <{:#x}>{}", key, value);
+
+    //     // FIXME: insert a new semaphore into the sems
+    //     //          use `insert(/* ... */).is_none()`
+    //     let sid = SemaphoreId::new(key);
+    //     let val = Mutex::new(Semaphore::new(value));
+    //     self.sems.insert(sid, val).is_none() // 插入新信号量
+    // }
     pub fn insert(&mut self, key: u32, value: usize) -> bool {
-        trace!("Sem Insert: <{:#x}>{}", key, value);
+        info!("Sem Insert: <{:#x}>{}", key, value);
 
         // FIXME: insert a new semaphore into the sems
         //          use `insert(/* ... */).is_none()`
+        let ret = self.sems.insert(SemaphoreId::new(key),Mutex::new(Semaphore::new(value))).is_none();
+        info!("Semaphore Insert Result: {}", ret); // 输出插入结果
+        ret
 
-        // let sid = SemaphoreId::new(key);
-        // self.sems.insert(sid, Mutex::new(Semaphore::new(value))).is_none() // 插入新信号量
     }
 
     pub fn remove(&mut self, key: u32) -> bool {
@@ -96,9 +102,8 @@ impl SemaphoreSet {
 
         // FIXME: remove the semaphore from the sems
         //          use `remove(/* ... */).is_some()`
-
-        // let sid = SemaphoreId::new(key);
-        // self.sems.remove(&sid).is_some() // 删除现有信号量
+        let sid = SemaphoreId::new(key);
+        self.sems.remove(&sid).is_some() // 删除现有信号量
     }
 
     /// Wait the semaphore (acquire/down/proberen)
@@ -108,14 +113,13 @@ impl SemaphoreSet {
         // FIXME: try get the semaphore from the sems
         //         then do it's operation
         // FIXME: return NotExist if the semaphore is not exist
-
-        // match self.sems.get(&sid) {  // 查找信号量
-        //     Some(sem) => {
-        //         let mut guard = sem.lock(); // 自旋锁保护操作
-        //         guard.wait(pid)       // 执行等待逻辑
-        //     },
-        //     None => SemaphoreResult::NotExist,
-        // }
+        match self.sems.get(&sid) {  // 查找信号量
+            Some(sem) => {
+                let mut guard = sem.lock(); // 自旋锁保护操作
+                guard.wait(pid)       // 执行等待逻辑
+            },
+            None => SemaphoreResult::NotExist,
+        }
     }
 
     /// Signal the semaphore (release/up/verhogen)
@@ -125,14 +129,13 @@ impl SemaphoreSet {
         // FIXME: try get the semaphore from the sems
         //         then do it's operation
         // FIXME: return NotExist if the semaphore is not exist
-
-        // match self.sems.get(&sid) {
-        //     Some(sem) => {
-        //         let mut guard = sem.lock();
-        //         guard.signal()       // 执行释放逻辑
-        //     },
-        //     None => SemaphoreResult::NotExist,
-        // }
+        match self.sems.get(&sid) {
+            Some(sem) => {
+                let mut guard = sem.lock();
+                guard.signal()       // 执行释放逻辑
+            },
+            None => SemaphoreResult::NotExist,
+        }
     }
 }
 

@@ -13,6 +13,8 @@ pub enum Syscall {
     GetTime = 2,
 
     GetPid = 39,
+
+    Sem = 40, // 0: new, 1: wait, 2: signal, 3: remove
     
     Fork = 58,
     Spawn = 59,

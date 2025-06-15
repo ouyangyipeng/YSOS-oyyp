@@ -113,3 +113,16 @@ pub fn sys_fork(context: &mut ProcessContext) {
     // context.set_rax(ret as usize);
     proc::fork(context);
 }
+
+pub fn sys_sem(args: &SyscallArgs, context: &mut ProcessContext) {
+    match args.arg0 {
+        0 => {
+            let ret = sem_new(args.arg1 as u32, args.arg2);
+            context.set_rax(ret);
+        },
+        1 => context.set_rax(sem_remove(args.arg1 as u32)),
+        2 => sem_signal(args.arg1 as u32, context),
+        3 => sem_wait(args.arg1 as u32, context),
+        _ => context.set_rax(usize::MAX),
+    }
+}

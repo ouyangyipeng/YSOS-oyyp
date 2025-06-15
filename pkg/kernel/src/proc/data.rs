@@ -12,21 +12,16 @@ use super::*;
 pub struct ProcessData {
     // shared data
     pub(super) env: Arc<RwLock<BTreeMap<String, String>>>,
-    // pub kernel_stack_range: (VirtAddr, VirtAddr), // 栈范围
-    // pub memory_usage: u64, // 内存使用量
-    // pub code_pages: usize, // 代码页数
-    // pub code_start: VirtAddr, // 代码起始地址
     pub(super) resources: Arc<RwLock<ResourceSet>>, // 文件符描述表
+    pub(super) semaphores: Arc<RwLock<SemaphoreSet>>,
 }
 
 impl Default for ProcessData {
     fn default() -> Self {
         Self {
             env: Arc::new(RwLock::new(BTreeMap::new())),
-            // memory_usage: 0,
-            // code_pages: 0,
-            // code_start: VirtAddr::new(0),
             resources: Arc::new(RwLock::new(ResourceSet::default())),
+            semaphores: Arc::new(RwLock::new(SemaphoreSet::default())),
         }
     }
 }
@@ -52,45 +47,20 @@ impl ProcessData {
         self.env.write().insert(key.into(), val.into());
     }
 
-    // pub fn set_memory_usage(&mut self, usage: u64) {
-    //     self.memory_usage = usage;
-    // }
+    pub fn sem_new(&self, key: u32, value: usize) -> bool {
+        info!("Creating new semaphore with key: {}", key);
+        self.semaphores.write().insert(key, value)
+    }
 
-    // pub fn set_code_pages(&mut self, pages: usize) {
-    //     self.code_pages = pages;
-    // }
+    pub fn sem_remove(&self, key: u32) -> bool {
+        self.semaphores.write().remove(key)
+    }
 
-    // pub fn set_code_start(&mut self, start: VirtAddr) {
-    //     self.code_start = start;
-    // }
+    pub fn sem_wait(&self, key: u32, pid: ProcessId) -> SemaphoreResult {
+        self.semaphores.read().wait(key, pid)
+    }
 
-    // pub fn memory_usage(&self) -> u64 {
-    //     self.memory_usage
-    // }
-
-    // pub fn code_pages(&self) -> usize {
-    //     self.code_pages
-    // }
-
-    // pub fn code_start(&self) -> VirtAddr {
-    //     self.code_start
-    // }
-    // pub fn code_range(&self) -> PageRangeInclusive {
-    //     Page::range_inclusive(
-    //         Page::containing_address(self.code_start),
-    //         Page::containing_address(self.code_start + self.code_pages as u64 * crate::memory::PAGE_SIZE - 1),
-    //     )
-    // }
-
-    // pub fn code_range_size(&self) -> usize {
-    //     self.code_pages * crate::memory::PAGE_SIZE
-    // }
-
-    // pub fn code_range_start(&self) -> VirtAddr {
-    //     self.code_start
-    // }
-
-    // pub fn code_range_end(&self) -> VirtAddr {
-    //     self.code_start + self.code_pages as u64 * crate::memory::PAGE_SIZE - 1
-    // }
+    pub fn sem_signal(&self, key: u32) -> SemaphoreResult {
+        self.semaphores.read().signal(key)
+    }
 }

@@ -242,7 +242,7 @@ impl ProcessManager {
         // FIXME: something like kernel thread
         self.add_proc(pid, proc);
         self.push_ready(pid);
-        info!("Push process #{} to ready queue", pid);
+        debug!("Push process #{} to ready queue", pid);
 
         pid 
     }
@@ -370,7 +370,7 @@ impl ProcessManager {
         
 
         // FOR DBG: maybe print the process ready queue?
-        info!("Process ready queue: {:#?}", self.ready_queue.lock());
+        debug!("Process ready queue: {:#?}", self.ready_queue.lock());
     }
 
     /// Block the process with the given pid
@@ -419,6 +419,30 @@ impl ProcessManager {
             // FIXME: push to ready queue
             self.push_ready(pid);
         }
+    }
+
+    pub fn sem_new(&self, key: u32, value: usize) -> bool {
+        trace!("Sem New: <{:#x}>", key);
+        let ret = self.current().write().sem_new(key, value);
+        ret
+    }
+
+    pub fn sem_remove(&self, key: u32) -> bool {
+        trace!("Sem Remove: <{:#x}>", key);
+        let ret = self.current().write().sem_remove(key);
+        ret
+    }
+
+    pub fn sem_wait(&self, key: u32, pid: ProcessId) -> SemaphoreResult {
+        trace!("Sem Wait: <{:#x}>", key);
+        let ret = self.current().write().sem_wait(key, pid);
+        ret
+    }
+
+    pub fn sem_signal(&self, key: u32) -> SemaphoreResult {
+        trace!("Sem Signal: <{:#x}>", key);
+        let ret = self.current().write().sem_signal(key);
+        ret
     }
 }
 
