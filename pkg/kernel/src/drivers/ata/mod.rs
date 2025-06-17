@@ -80,20 +80,48 @@ use storage::{Block512, BlockDevice};
 impl BlockDevice<Block512> for AtaDrive {
     fn block_count(&self) -> storage::FsResult<usize> {
         // FIXME: return the block count
-        todo!()
+        Ok(self.blocks as usize)
     }
 
     fn read_block(&self, offset: usize, block: &mut Block512) -> storage::FsResult {
         // FIXME: read the block
         //      - use `BUSES` and `self` to get bus
         //      - use `read_pio` to get data
-        todo!()
+        BUSES[self.bus as usize]
+            .lock()
+            .read_pio(
+                self.drive, 
+                offset as u32, 
+                block.as_mut()
+            )
+            .map_err(|e| e.into())
+            .and_then(|_| {
+                if block.len() != 512 {
+                    Err(storage::DeviceError::ReadError.into())
+                } else {
+                    Ok(())
+                }
+            })
     }
 
     fn write_block(&self, offset: usize, block: &Block512) -> storage::FsResult {
         // FIXME: write the block
         //      - use `BUSES` and `self` to get bus
         //      - use `write_pio` to write data
-        todo!()
+        BUSES[self.bus as usize]
+            .lock()
+            .write_pio(
+                self.drive,
+                offset as u32,
+                block.as_ref()
+            )
+            .map_err(|e| e.into())
+            .and_then(|_| {
+                if block.len() != 512 {
+                    Err(storage::DeviceError::WriteError.into())
+                } else {
+                    Ok(())
+                }
+            })
     }
 }

@@ -140,7 +140,29 @@ impl AtaBus {
             // FIXME: store the LBA28 address into four 8-bit registers
             //      - read the documentation for more information
             //      - enable LBA28 mode by setting the drive register
+            self.lba_low.write(bytes[0]); // LBA low
+            self.lba_mid.write(bytes[1]); // LBA mid
+            self.lba_high.write(bytes[2]); // LBA high
+
+            // 0-3是lba的24-27位，4是分辨主从盘，5、7必须为1，6是lba模式/chs模式
+            // 构建drive寄存器值
+            let mut drive_val = 0xA0; // 二进制10100000 (位7,5=1 + LBA模式=1)
+            
+            // 设置驱动器选择(位4)
+            if drive != 0 { // 假设drive=0表示主盘，非0表示从盘
+                drive_val |= 0x10; // 设置位4为1
+            }
+            
+            // 设置LBA最高4位(位3-0)
+            drive_val |= (bytes[3] & 0x0F); // 取block的第24-27位
+            
+            // 写入drive寄存器
+            self.drive.write(drive_val);
+
+            // self.drive.write(0xE0 | ((drive & 1) << 4) | ((bytes[3] & 0x0F)));
+
             // FIXME: write the command register (cmd as u8)
+            self.command.write(cmd as u8);
         }
 
         if self.status().is_empty() {
@@ -149,6 +171,7 @@ impl AtaBus {
         }
 
         // FIXME: poll for the status to be not BUSY
+        self.poll(AtaStatus::BUSY, false);
 
         if self.is_error() {
             warn!("ATA error: {:?} command error", cmd);
@@ -157,6 +180,9 @@ impl AtaBus {
         }
 
         // FIXME: poll for the status to be not BUSY and DATA_REQUEST_READY
+        // self.poll(AtaStatus::BUSY | AtaStatus::DATA_REQUEST_READY, true);
+        self.poll(AtaStatus::BUSY, false);
+        self.poll(AtaStatus::DATA_REQUEST_READY,true);
 
         Ok(())
     }
@@ -171,8 +197,10 @@ impl AtaBus {
         //      - call `write_command` with `drive` and `0` as the block number
         //      - if the status is empty, return `AtaDeviceType::None`
         //      - else return `DeviceError::Unknown` as `FsError`
+        self.write_command(drive, 0, AtaCommand::IdentifyDevice)?;
 
         // FIXME: poll for the status to be not BUSY
+        self.poll(AtaStatus::BUSY, false);
 
         Ok(match (self.cylinder_low(), self.cylinder_high()) {
             // we only support PATA drives
@@ -201,6 +229,13 @@ impl AtaBus {
         //      - use `buf.chunks_mut(2)`
         //      - use `self.read_data()`
         //      - ! pay attention to data endianness
+        for chunk in buf.chunks_mut(2) {
+            // let data = self.read_data();
+            // chunk[0] = (data & 0xFF) as u8; // lower byte
+            // chunk[1] = (data >> 8) as u8;   // upper byte
+            let data = self.read_data().to_le_bytes();
+            chunk.copy_from_slice(&data);
+        }
 
         if self.is_error() {
             debug!("ATA error: data read error");
@@ -222,6 +257,10 @@ impl AtaBus {
         //      - use `buf.chunks(2)`
         //      - use `self.write_data()`
         //      - ! pay attention to data endianness
+        for chunk in buf.chunks(2) {
+            let data = u16::from_le_bytes(chunk.try_into().unwrap_or([0, 0]));
+            self.write_data(data);
+        }
 
         if self.is_error() {
             debug!("ATA error: data write error");

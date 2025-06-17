@@ -31,9 +31,34 @@ impl MbrPartition {
     // an example of how to define a field
     // move your mouse on the `define_field!` to see the docs
     define_field!(u8, 0x00, status);
+    // 根据test里面的来
+    define_field!(u8, 0x01, begin_head);
+    define_field!(u8, 0x04, partition_type);
+    define_field!(u8, 0x05, end_head);
+    define_field!(u32, 0x08, begin_lba);
+    define_field!(u32, 0x0C, total_lba);
 
+    // 原有
     pub fn is_active(&self) -> bool {
         self.status() == 0x80
+    }
+
+    // 文档：对于 0x01-0x03 和 0x05-0x07 两组三字节的内容分别表示了开始和结束的 CHS 地址，包含三组内容：磁头号、扇区号和柱面号，分别占用 8、6 和 10 比特，因此无法使用 define_field 进行简单定义，需要你自行实现 head、sector 和 cylinder 所对应的函数，对 data 进行解析。
+
+    pub fn begin_sector(&self) -> u16 {
+        (self.data[0x02] & 0x3F) as u16
+    }
+
+    pub fn begin_cylinder(&self) -> u16 {
+        ((self.data[0x02] & 0xC0) as u16) << 2 | ((self.data[0x03] as u16 & 0xff) as u16)
+    }
+
+    pub fn end_sector(&self) -> u16 {
+        (self.data[0x06] & 0x3F) as u16
+    }
+
+    pub fn end_cylinder(&self) -> u16 {
+        (((self.data[0x06] & 0xC0) as u16) << 2) as u16 | ((self.data[0x07] as u16 & 0xff) as u16)
     }
 }
 

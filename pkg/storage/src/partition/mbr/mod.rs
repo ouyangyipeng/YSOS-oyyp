@@ -40,6 +40,13 @@ where
             partitions.push(
                 // FIXME: parse the mbr partition from the buffer
                 //      - just ignore other fields for mbr
+                // 所以这里应该就是要调用entry里面的那个parse
+                // 从0x1BE开始，每个分区占16字节
+                MbrPartition::parse(
+                    &buffer[0x1BE + i * 16..0x1BE + (i + 1) * 16]
+                        .try_into()
+                        .expect("Invalid partition entry size"),
+                ),
             );
 
             if partitions[i].is_active() {
