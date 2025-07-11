@@ -128,3 +128,18 @@ pub fn sys_signal_sem(key: u32) -> bool {
 pub fn sys_wait_sem(key: u32) -> bool {
     syscall!(Syscall::Sem, 3, key as usize) != 0
 }
+
+#[inline(always)]
+pub fn sys_list_dir(path: &str) {
+    syscall!(Syscall::ListDir, path.as_ptr() as u64, path.len() as u64);
+}
+
+#[inline(always)]
+pub fn sys_open_file(path: &str) -> u8 {
+    syscall!(Syscall::OpenFile, path.as_ptr() as u64, path.len() as u64) as u8
+}
+
+#[inline(always)]
+pub fn sys_close_file(fd: u8) -> bool {
+    syscall!(Syscall::CloseFile, fd as u64) == 0
+}

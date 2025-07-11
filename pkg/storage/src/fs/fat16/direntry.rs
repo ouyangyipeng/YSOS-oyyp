@@ -58,6 +58,12 @@ impl DirEntry {
         // FIXME: parse the rest of the fields
         //      - ensure you can pass the test
         //      - you may need `prase_datetime` function
+        let created_time = prase_datetime(u32::from_le_bytes(data[14..18].try_into().unwrap()));
+        let accessed_time = prase_datetime(u32::from_le_bytes([0, 0, data[18], data[19]]));
+        let modified_time = prase_datetime(u32::from_le_bytes(data[22..26].try_into().unwrap()));
+        let attributes = Attributes::from_bits(data[11]).unwrap_or(Attributes::empty());
+        let cluster = u32::from_le_bytes([data[26], data[27], data[20], data[21]]);
+        let size = u32::from_le_bytes(data[28..32].try_into().unwrap());
 
         Ok(DirEntry {
             filename,
@@ -73,10 +79,43 @@ impl DirEntry {
     pub fn as_meta(&self) -> Metadata {
         self.into()
     }
+    pub fn is_long_name(&self)->bool{
+        self.attributes.contains(Attributes::LFN)
+    }
+    pub fn is_valid(&self)->bool{
+        !self.filename.is_eod() && !self.filename.is_unused()
+    }
+    pub fn is_directory(&self)->bool{
+        self.attributes.contains(Attributes::DIRECTORY)
+    }
 }
 
 fn prase_datetime(time: u32) -> FsTime {
     // FIXME: parse the year, month, day, hour, min, sec from time
+    // 其中文件的日期包括三个部分：
+
+    // [4:0]：日（从 1 至 31）
+    // [8:5]：月（从 1 至 12）
+    // [15:9]：从 1980 年起的年份偏移（从 0 至 127）
+    // 文件的时间同样也包括三个部分：
+
+    // [4:0]：从零起经过的 2s 间隔数（从 0 至 29）
+    // [10:5]：分（从 0 至 59）
+    // [15:11]：时（从 0 至 23）
+     let date = (time >> 16) as u16;
+     let time_field = time as u16;
+ 
+     let day = (date & 0x1F) as u32;
+     let month = ((date >> 5) & 0xF) as u32;
+ 
+     let year = (((date >> 9) & 0x7F) + 1980) as i32;
+ 
+ 
+     let sec = ((time_field & 0x1F) * 2) as u32;
+ 
+     let min = ((time_field >> 5) & 0x3F) as u32;
+ 
+     let hour = ((time_field >> 11) & 0x1F) as u32;
 
     if let Single(time) = Utc.with_ymd_and_hms(year, month, day, hour, min, sec) {
         time
@@ -133,6 +172,36 @@ impl ShortFileName {
         //      - check if the filename contains invalid characters:
         //        [0x00..=0x1F, 0x20, 0x22, 0x2A, 0x2B, 0x2C, 0x2F, 0x3A,
         //        0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x5B, 0x5C, 0x5D, 0x7C]
+        if name.is_empty(){
+            return Err(FilenameError::FilenameEmpty.into());
+        }
+        let name = name.to_uppercase();
+        if name.contains('\x20') {
+            return Err(FilenameError::MisplacedPeriod.into());
+        }
+        let vec_name:Vec<_> = name.split(".").collect();
+        let name = vec_name[0];
+        let extension = vec_name.get(1).map(|s| s.as_ref()).unwrap_or("");
+        if name.len() > 8 || extension.len() > 3 {
+            return Err(FilenameError::NameTooLong.into());
+        }
+
+        let forbidden_chars:Vec<_> = [
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
+            0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B,
+            0x1C, 0x1D, 0x1E, 0x1F, 0x22, 0x2A, 0x2B, 0x2C, 0x2F, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E,
+            0x3F, 0x5B, 0x5C, 0x5D, 0x7C,
+        ].iter().map(|&c| c as u8 as char).collect();
+        if name.chars().any(|c| forbidden_chars.contains(&c)) {
+            return Err(FilenameError::InvalidCharacter.into());
+        }
+        let name = format!("{:8}", name);
+        let extension = format!("{:3}", extension);
+
+        Ok(ShortFileName {
+            name: name.as_bytes().try_into().unwrap(),
+            ext: extension.as_bytes().try_into().unwrap(),
+        })
     }
 }
 

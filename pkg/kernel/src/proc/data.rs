@@ -5,8 +5,9 @@ use x86_64::structures::paging::{
     Page,
 };
 
-use crate::resource::ResourceSet;
+use crate::resource::{ResourceSet ,Resource};
 use super::*;
+use crate::filesystem::get_rootfs;
 
 #[derive(Debug, Clone)]
 pub struct ProcessData {
@@ -48,7 +49,7 @@ impl ProcessData {
     }
 
     pub fn sem_new(&self, key: u32, value: usize) -> bool {
-        info!("Creating new semaphore with key: {}", key);
+        // info!("Creating new semaphore with key: {}", key);
         self.semaphores.write().insert(key, value)
     }
 
@@ -62,5 +63,14 @@ impl ProcessData {
 
     pub fn sem_signal(&self, key: u32) -> SemaphoreResult {
         self.semaphores.read().signal(key)
+    }
+
+    pub fn open_file(&self, path: &str) -> u8 {
+        let handle: storage::FileHandle = get_rootfs().fs.open_file(path).unwrap();
+        self.resources.write().open(Resource::File(handle))
+    }
+
+    pub fn close_file(&self, fd: u8) -> bool {
+        self.resources.write().close(fd)
     }
 }

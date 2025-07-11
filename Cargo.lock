@@ -562,6 +562,7 @@ dependencies = [
  "yslib",
  "ysos_boot",
  "ysos_elf",
+ "ysos_storage",
  "ysos_syscall",
 ]
 

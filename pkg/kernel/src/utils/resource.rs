@@ -5,6 +5,7 @@ use spin::Mutex;
 // use spin::RwLock;
 // use x86_64::structures::paging::Page;
 // use x86_64::VirtAddr;
+use storage::FileHandle;
 
 
 
@@ -65,12 +66,20 @@ impl ResourceSet {
 #[derive(Debug)]
 pub enum Resource {
     Console(StdIO),
+    File(FileHandle),
     Null,
 }
 
 impl Resource {
     pub fn read(&mut self, buf: &mut [u8]) -> Option<usize> {
         match self {
+            Resource::File(file) => {
+                if let Ok(size) = file.read(buf) {
+                    Some(size)
+                } else {
+                    Some(0)
+                }
+            }
             Resource::Console(stdio) => match stdio {
                 StdIO::Stdin => {
                     // FIXME: just read from kernel input buffer
@@ -89,6 +98,7 @@ impl Resource {
 
     pub fn write(&mut self, buf: &[u8]) -> Option<usize> {
         match self {
+            Resource::File(_file) => Some(0),
             Resource::Console(stdio) => match *stdio {
                 StdIO::Stdin => None,
                 StdIO::Stdout => {

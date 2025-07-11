@@ -4,6 +4,7 @@ use crate::proc;
 use crate::proc::*;
 use crate::utils;
 use crate::utils::*;
+use crate::filesystem;
 
 use super::SyscallArgs;
 
@@ -125,4 +126,30 @@ pub fn sys_sem(args: &SyscallArgs, context: &mut ProcessContext) {
         3 => sem_wait(args.arg1 as u32, context),
         _ => context.set_rax(usize::MAX),
     }
+}
+
+pub fn list_dir(args: &SyscallArgs) {
+    let path = unsafe {
+        core::str::from_utf8_unchecked(core::slice::from_raw_parts(
+            args.arg0 as *const u8,
+            args.arg1,
+        ))
+    };
+    filesystem::ls(path);
+
+}
+
+pub fn sys_open_file(args: &SyscallArgs) -> usize{
+    let path = unsafe {
+        core::str::from_utf8_unchecked(core::slice::from_raw_parts(
+            args.arg0 as *const u8,
+            args.arg1,
+        ))
+    };
+    open_file(path) as usize
+}
+
+pub fn sys_close_file(args: &SyscallArgs) -> bool {
+    let fd = args.arg0 as u8;
+    close_file(fd)
 }

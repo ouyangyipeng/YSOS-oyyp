@@ -25,6 +25,14 @@ lazy_static! {
     };
 }
 
+// 根据文档
+pub const ATA_IDENT_SERIAL:usize = 20 ;  // 20 bytes
+pub const ATA_IDENT_SERIAL_SIZE:usize = 20;
+pub const ATA_IDENT_MODEL:usize = 54;   // 40 bytes
+pub const ATA_IDENT_MODEL_SIZE:usize = 40;
+pub const ATA_IDENT_MAX_LBA:usize = 120; // 4 bytes (unsigned int)
+pub const ATA_IDENT_MAX_LBA_SIZE:usize = 4;
+
 #[derive(Clone)]
 pub struct AtaDrive {
     pub bus: u8,
@@ -41,9 +49,30 @@ impl AtaDrive {
         // we only support PATA drives
         if let Ok(AtaDeviceType::Pata(res)) = BUSES[bus as usize].lock().identify_drive(drive) {
             let buf = res.map(u16::to_be_bytes).concat();
-            let serial = { /* FIXME: get the serial from buf */ };
-            let model = { /* FIXME: get the model from buf */ };
-            let blocks = { /* FIXME: get the block count from buf */ };
+            let serial = { /* FIXME: get the serial from buf */ 
+                String::from_utf8_lossy(
+                    &buf[ATA_IDENT_SERIAL..ATA_IDENT_SERIAL + ATA_IDENT_SERIAL_SIZE],
+                )
+                // .trim_end_matches('\0')
+                .trim()
+                .into()
+            };
+            let model = { /* FIXME: get the model from buf */ 
+                String::from_utf8_lossy(
+                    &buf[ATA_IDENT_MODEL..ATA_IDENT_MODEL + ATA_IDENT_MODEL_SIZE],
+                )
+                // .trim_end_matches('\0')
+                .trim()
+                .into()
+            };
+            let blocks = { /* FIXME: get the block count from buf */ 
+                u32::from_be_bytes(
+                    buf[ATA_IDENT_MAX_LBA..ATA_IDENT_MAX_LBA + ATA_IDENT_MAX_LBA_SIZE]
+                        .try_into()
+                        .unwrap_or([0; ATA_IDENT_MAX_LBA_SIZE])
+                )
+                .rotate_left(16)
+            };
             let ata_drive = Self {
                 bus,
                 drive,
@@ -64,7 +93,10 @@ impl AtaDrive {
         let count = self.block_count().unwrap();
         let bytes = size * count;
 
-        crate::humanized_size(bytes as u64)
+        // 这里有点问题
+        // crate::humanized_size(bytes as u64)
+        let result = crate::humanized_size(bytes as u64);
+        (result.0 as f32,result.1)
     }
 }
 
@@ -94,14 +126,14 @@ impl BlockDevice<Block512> for AtaDrive {
                 offset as u32, 
                 block.as_mut()
             )
-            .map_err(|e| e.into())
-            .and_then(|_| {
-                if block.len() != 512 {
-                    Err(storage::DeviceError::ReadError.into())
-                } else {
-                    Ok(())
-                }
-            })
+            // .map_err(|e| e.into())
+            // .and_then(|_| {
+            //     if block.len() != 512 {
+            //         Err(storage::DeviceError::ReadError.into())
+            //     } else {
+            //         Ok(())
+            //     }
+            // })
     }
 
     fn write_block(&self, offset: usize, block: &Block512) -> storage::FsResult {
@@ -115,13 +147,13 @@ impl BlockDevice<Block512> for AtaDrive {
                 offset as u32,
                 block.as_ref()
             )
-            .map_err(|e| e.into())
-            .and_then(|_| {
-                if block.len() != 512 {
-                    Err(storage::DeviceError::WriteError.into())
-                } else {
-                    Ok(())
-                }
-            })
+            // .map_err(|e| e.into())
+            // .and_then(|_| {
+            //     if block.len() != 512 {
+            //         Err(storage::DeviceError::WriteError.into())
+            //     } else {
+            //         Ok(())
+            //     }
+            // })
     }
 }

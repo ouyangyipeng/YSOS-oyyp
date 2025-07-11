@@ -78,6 +78,15 @@ pub fn dispatcher(context: &mut ProcessContext) {
             sys_sem(&args, context);
         },
 
+        // path: &str (ptr: arg0 as *const u8, len: arg1) -> pid: u16
+        Syscall::ListDir => list_dir(&args),
+
+        // fd: u8, path: &str (ptr: arg1 as *const u8, len: arg2) -> fd: u8
+        Syscall::OpenFile => context.set_rax(sys_open_file(&args)),
+
+        // fd: u8 -> ret: bool
+        Syscall::CloseFile => context.set_rax(sys_close_file(&args) as usize),
+
         // None -> pid: u16 or 0 or -1
         Syscall::Fork => {
             sys_fork(context);

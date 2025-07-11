@@ -87,12 +87,12 @@ impl SemaphoreSet {
     //     self.sems.insert(sid, val).is_none() // 插入新信号量
     // }
     pub fn insert(&mut self, key: u32, value: usize) -> bool {
-        info!("Sem Insert: <{:#x}>{}", key, value);
+        // info!("Sem Insert: <{:#x}>{}", key, value);
 
         // FIXME: insert a new semaphore into the sems
         //          use `insert(/* ... */).is_none()`
         let ret = self.sems.insert(SemaphoreId::new(key),Mutex::new(Semaphore::new(value))).is_none();
-        info!("Semaphore Insert Result: {}", ret); // 输出插入结果
+        // info!("Semaphore Insert Result: {}", ret); // 输出插入结果
         ret
 
     }

@@ -1,6 +1,7 @@
 use crate::*;
 
 pub type FsResult<T = ()> = core::result::Result<T, FsError>;
+pub type Result<T = ()> = core::result::Result<T, FsError>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum FsError {

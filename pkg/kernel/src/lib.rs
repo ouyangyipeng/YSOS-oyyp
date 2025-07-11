@@ -23,7 +23,7 @@ pub use utils::*;
 
 #[macro_use]
 pub mod drivers;
-pub use drivers::*;
+pub use drivers::{*, ata::AtaDrive};
 
 pub mod memory;
 pub mod proc;
@@ -33,6 +33,7 @@ pub use alloc::format;
 
 use boot::BootInfo;
 use uefi::{Status, runtime::ResetType};
+
 
 pub fn init(boot_info: &'static BootInfo) {
     unsafe {
@@ -56,6 +57,11 @@ pub fn init(boot_info: &'static BootInfo) {
     info!("Interrupts Enabled.");
 
     info!("YatSenOS initialized.");
+    
+    drivers::filesystem::init();
+    info!("Filesystem initialized.");
+    AtaDrive::open(0, 0);
+
 }
 
 pub fn shutdown() -> ! {

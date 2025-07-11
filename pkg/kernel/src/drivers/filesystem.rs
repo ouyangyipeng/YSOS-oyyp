@@ -4,7 +4,8 @@ use chrono::DateTime;
 use storage::fat16::Fat16;
 use storage::mbr::*;
 use storage::*;
-
+use alloc::format;
+use crate::alloc::string::ToString;
 pub static ROOTFS: spin::Once<Mount> = spin::Once::new();
 
 pub fn get_rootfs() -> &'static Mount {
@@ -47,4 +48,43 @@ pub fn ls(root_path: &str) {
     //      - add '/' to the end of directory names
     //      - format the date as you like
     //      - do not forget to print the table header
+    println!(
+        "{:<12} {:<12} {:<12} {:<20} {:<20} {:<20}",
+        "Name", "Type", "Size", "Created Time", "Last Modified", "Last Access"
+    );
+    for meta in iter {
+        let filetype = {
+            if meta.is_dir() {
+                "Directory"
+            } else {
+                "File"
+            }
+        };
+        let mut name = meta.name;
+        if filetype == "Directory" {
+            name.push('/');
+        }
+        let (num, unit) = crate::humanized_size(meta.len as u64);
+        let size = format!("{:.2} {}", num, unit);
+        let created_time = meta
+            .created
+            .unwrap()
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string();
+        let last_modified = meta
+            .modified
+            .unwrap()
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string();
+        let last_access = meta
+            .accessed
+            .unwrap()
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string();
+
+        println!(
+            "{:<12} {:<12} {:<12} {:<20} {:<20} {:<20}",
+            name, filetype, size, created_time, last_modified, last_access
+        );
+    }
 }

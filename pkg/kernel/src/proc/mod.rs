@@ -350,9 +350,9 @@ pub fn fork(context: &mut ProcessContext) {
 pub fn sem_new(key: u32, val: usize) -> usize {
     x86_64::instructions::interrupts::without_interrupts(|| {
         let manager = get_process_manager();
-        info!("Creating new semaphore with key: {}, value: {}", key, val);
+        // info!("Creating new semaphore with key: {}, value: {}", key, val);
         let ret = manager.current().write().sem_new(key, val);
-        info!("returned from sem_new: {}", ret);
+        // info!("returned from sem_new: {}", ret);
         ret as usize
     })
 }
@@ -402,4 +402,12 @@ pub fn sem_wait(key: u32, context: &mut ProcessContext) {
             _ => unreachable!(),
         }
     })
+}
+
+pub fn open_file(path: &str) -> u8 {
+    x86_64::instructions::interrupts::without_interrupts(|| get_process_manager().open_file(path))
+}
+
+pub fn close_file(fd: u8) -> bool {
+    x86_64::instructions::interrupts::without_interrupts(|| get_process_manager().close_file(fd))
 }

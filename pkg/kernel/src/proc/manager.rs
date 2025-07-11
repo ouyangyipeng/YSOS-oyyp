@@ -444,6 +444,14 @@ impl ProcessManager {
         let ret = self.current().write().sem_signal(key);
         ret
     }
+
+    pub fn open_file(&self, path: &str) -> u8 {
+        self.current().write().open_file(path)
+    }
+    
+    pub fn close_file(&self, fd: u8) -> bool {
+        self.current().write().close_file(fd)
+    }
 }
 
 impl core::fmt::Debug for ProcessManager {

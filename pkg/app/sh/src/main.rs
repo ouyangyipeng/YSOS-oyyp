@@ -64,6 +64,19 @@ fn main() -> isize {
                 let path = command.next().unwrap();
                 run(path);
             }
+            "ls" =>{
+                  sys_list_dir(command.next().unwrap_or("/"));
+            }
+            "cat" => {
+                let fd = sys_open_file(command.next().unwrap_or(""));
+                let buf = &mut [0u8; 1024];
+                sys_read(fd, buf);
+                println!(
+                    "{}",
+                    core::str::from_utf8(buf).unwrap_or("Failed to read file")
+                );
+                sys_close_file(fd);
+            }
             _ => {
                 println!("Unknown command: {}", input);
                 println!("Type 'help' for a list of available commands.");

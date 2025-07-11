@@ -363,7 +363,7 @@ impl ProcessInner {
     }
 
     pub fn sem_new(&mut self, key: u32, val: usize) -> bool {
-        info!("Creating new semaphore with key: {}, value: {}", key, val);
+        // info!("Creating new semaphore with key: {}, value: {}", key, val);
         self.data_mut().sem_new(key, val)
     }
 
@@ -377,6 +377,10 @@ impl ProcessInner {
     
     pub fn sem_signal(&mut self, key: u32) -> SemaphoreResult {
         self.data_mut().sem_signal(key)
+    }
+
+    pub fn open_file(&mut self, path: &str) -> u8 {
+        self.proc_data.as_mut().unwrap().open_file(path)
     }
 }
 
