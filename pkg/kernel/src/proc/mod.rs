@@ -132,7 +132,7 @@ pub fn switch(context: &mut ProcessContext) {
 
 pub fn print_process_list() {
     x86_64::instructions::interrupts::without_interrupts(|| {
-        // get_process_manager().print_process_list();
+        get_process_manager().print_process_list();
     })
 }
 

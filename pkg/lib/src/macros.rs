@@ -1,13 +1,13 @@
-use crate::alloc::string::ToString;
 use crate::errln;
+use alloc::string::ToString;
 
 #[macro_export]
 macro_rules! entry {
     ($fn:ident) => {
         #[unsafe(export_name = "_start")]
         pub extern "C" fn __impl_start() {
+            lib::init(); // THIS LINE IS NEW IN LAB 7
             let ret = $fn();
-            // FIXME: after syscall, add lib::sys_exit(ret);
             lib::sys_exit(ret);
         }
     };
@@ -32,6 +32,43 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
         info.message()
     );
 
-    // FIXME: after syscall, add lib::sys_exit(1);
-    crate::sys_exit(2);
+    crate::sys_exit(1);
 }
+
+// use crate::alloc::string::ToString;
+// use crate::errln;
+
+// #[macro_export]
+// macro_rules! entry {
+//     ($fn:ident) => {
+//         #[unsafe(export_name = "_start")]
+//         pub extern "C" fn __impl_start() {
+//             let ret = $fn();
+//             // FIXME: after syscall, add lib::sys_exit(ret);
+//             lib::sys_exit(ret);
+//         }
+//     };
+// }
+
+// #[cfg_attr(not(test), panic_handler)]
+// fn panic(info: &core::panic::PanicInfo) -> ! {
+//     let location = if let Some(location) = info.location() {
+//         alloc::format!(
+//             "{}@{}:{}",
+//             location.file(),
+//             location.line(),
+//             location.column()
+//         )
+//     } else {
+//         "Unknown location".to_string()
+//     };
+
+//     errln!(
+//         "\n\n\rERROR: panicked at {}\n\n\r{}",
+//         location,
+//         info.message()
+//     );
+
+//     // FIXME: after syscall, add lib::sys_exit(1);
+//     crate::sys_exit(2);
+// }

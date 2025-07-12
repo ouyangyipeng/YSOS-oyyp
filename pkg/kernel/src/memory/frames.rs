@@ -20,7 +20,8 @@ pub struct BootInfoFrameAllocator {
     size: usize,
     used: usize,
     frames: BootInfoFrameIter,
-    recycled: Vec<u32>,
+    // recycled: Vec<u32>,
+    recycled: Vec<PhysFrame>,
 }
 
 // ! 主结构体
@@ -50,6 +51,9 @@ impl BootInfoFrameAllocator {
     pub fn recycled_count(&self) -> usize {
         self.recycled.len() as usize
     }
+    pub fn frames_recycled(&self) -> usize {
+        self.recycled.len()
+    }
 }
 
 // ! 实现分配器接口
@@ -59,7 +63,8 @@ unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
         // self.used += 1;
         // self.frames.next()
         if let Some(frame) = self.recycled.pop() {
-            Some(u32_to_phys_frame(frame))
+            // Some(u32_to_phys_frame(frame))
+            Some(frame)
         } else {
             self.used += 1;
             self.frames.next()
@@ -70,7 +75,8 @@ unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
 impl FrameDeallocator<Size4KiB> for BootInfoFrameAllocator {
     unsafe fn deallocate_frame(&mut self, _frame: PhysFrame) {
         // TODO: deallocate frame (not for lab 2)
-        let key = phys_frame_to_u32(_frame);
+        // let key = phys_frame_to_u32(_frame);
+        let key = _frame;
         self.recycled.push(key);
     }
 }

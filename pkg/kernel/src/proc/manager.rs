@@ -1,12 +1,13 @@
 use super::*;
-// use crate::memory::{
-//     self,
-//     allocator::{ALLOCATOR, HEAP_SIZE},
-//     get_frame_alloc_for_sure, PAGE_SIZE,
-// };
-use crate::{memory, proc::vm::ProcessVm};
+use crate::memory::{
+    self,
+    allocator::{ALLOCATOR, HEAP_SIZE},
+    get_frame_alloc_for_sure, PAGE_SIZE,
+};
+use crate::{proc::vm::ProcessVm};
 use alloc::{collections::*, format, string::String, sync::Arc, sync::Weak};
 use spin::{Mutex, RwLock};
+use crate::utils::humanized_size;
 use vm::stack::STACK_INIT_TOP;
 
 pub static PROCESS_MANAGER: spin::Once<ProcessManager> = spin::Once::new();
@@ -336,8 +337,25 @@ impl ProcessManager {
         //     .filter(|p| p.read().status() != ProgramStatus::Dead)
         //     .for_each(|p| output += format!("{}\n", p).as_str());
 
+        // let mut output =
+        //     String::from("  PID | PPID | Process Name |  Ticks  | Status | Memory Usage\n");
+
+        // for (_, p) in self.processes.read().iter() {
+        //     if p.read().status() != ProgramStatus::Dead {
+        //         output += format!("{}\n", p).as_str();
+        //     }
+        // }
+
+        // // TODO: print memory usage of kernel heap
+
+        // output += format!("Queue  : {:?}\n", self.ready_queue.lock()).as_str();
+
+        // output += &processor::print_processors();
+
+        // print!("{}", output);
+        
         let mut output =
-            String::from("  PID | PPID | Process Name |  Ticks  | Status | Memory Usage\n");
+            String::from("  PID | PPID | Process Name |  Ticks  | Memory Usage | Status\n");
 
         for (_, p) in self.processes.read().iter() {
             if p.read().status() != ProgramStatus::Dead {
@@ -346,12 +364,36 @@ impl ProcessManager {
         }
 
         // TODO: print memory usage of kernel heap
-
+        let alloc: spin::MutexGuard<'_, memory::BootInfoFrameAllocator> = get_frame_alloc_for_sure();
+        let frames_used = alloc.frames_used();
+        let frames_recycled = alloc.frames_recycled();
+        let frames_total = alloc.frames_total();
+        let used = (frames_used - frames_recycled) * PAGE_SIZE as usize;
+        let total = frames_total * PAGE_SIZE as usize;
+        output += &Self::format_usage("Memory", used, total);
+        drop(alloc);
         output += format!("Queue  : {:?}\n", self.ready_queue.lock()).as_str();
-
         output += &processor::print_processors();
 
         print!("{}", output);
+    }
+
+    // A helper function to format memory usage
+    fn format_usage(name: &str, used: usize, total: usize) -> String {
+        let (used_float, used_unit) = humanized_size(used as u64);
+        let (total_float, total_unit) = humanized_size(total as u64);
+
+        format!(
+            "{:<6} : {:>6.*} {:>3} / {:>6.*} {:>3} ({:>5.2}%)\n",
+            name,
+            2,
+            used_float,
+            used_unit,
+            2,
+            total_float,
+            total_unit,
+            used as f32 / total as f32 * 100.0
+        )
     }
 
     pub fn fork(&self) {

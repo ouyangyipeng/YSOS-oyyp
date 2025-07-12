@@ -11,10 +11,10 @@ use super::{FrameAllocatorRef, MapperRef};
 // user process runtime heap
 // 0x100000000 bytes -> 4GiB
 // from 0x0000_2000_0000_0000 to 0x0000_2000_ffff_fff8
-pub const HEAP_START: u64 = 0x2000_0000_0000;
-pub const HEAP_PAGES: u64 = 0x100000;
-pub const HEAP_SIZE: u64 = HEAP_PAGES * crate::memory::PAGE_SIZE;
-pub const HEAP_END: u64 = HEAP_START + HEAP_SIZE - 8;
+pub const HEAP_START: u64 = 0x2000_0000_0000;       // 堆起始地址
+pub const HEAP_PAGES: u64 = 0x100000;               // 堆总页数 (1,048,576 页)
+pub const HEAP_SIZE: u64 = HEAP_PAGES * 4096;       // 堆总大小 (4GiB)
+pub const HEAP_END: u64 = HEAP_START + HEAP_SIZE - 8; // 堆结束地址(含8字节padding)
 
 /// User process runtime heap
 ///
@@ -23,12 +23,12 @@ pub struct Heap {
     /// the base address of the heap
     ///
     /// immutable after initialization
-    base: VirtAddr,
+    base: VirtAddr,// 堆基地址 (固定)
 
     /// the current end address of the heap
     ///
     /// use atomic to allow multiple threads to access the heap
-    end: Arc<AtomicU64>,
+    end: Arc<AtomicU64>,// 当前堆顶地址 (原子操作)
 }
 
 impl Heap {

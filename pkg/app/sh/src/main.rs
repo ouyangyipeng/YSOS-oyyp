@@ -33,7 +33,7 @@ fn main() -> isize {
         }
 
         match input {
-            "exit" => {
+            "exit" | "quit" | "q" => {
                 println!("Exiting...");
                 break
             }

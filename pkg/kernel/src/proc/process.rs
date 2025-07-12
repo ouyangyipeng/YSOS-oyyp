@@ -12,6 +12,7 @@ use elf::*;
 use x86_64::VirtAddr;
 // for Type::Load
 use xmas_elf::program::Type;
+use crate::utils::humanized_size;
 
 #[derive(Clone)]
 pub struct Process {
@@ -428,22 +429,40 @@ impl core::fmt::Debug for Process {
     }
 }
 
+// impl core::fmt::Display for Process {
+//     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+//         let inner = self.inner.read();
+//         write!(
+//             f,
+//             // " #{:-3} | #{:-3} | {:12} | {:7} | {:?} | {:?} | {:?} | {:?}",
+//             " #{:-3} | #{:-3} | {:12} | {:7} | {:?} | {:?}",
+//             self.pid.0,
+//             inner.parent().map(|p| p.pid.0).unwrap_or(0),
+//             inner.name,
+//             inner.ticks_passed,
+//             inner.status,
+//             inner.vm().memory_usage(),
+//             // inner.data().memory_usage(),
+//             // inner.data().code_pages(),
+//             // inner.data().code_start(),
+//         )?;
+//         Ok(())
+//     }
+// }
 impl core::fmt::Display for Process {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         let inner = self.inner.read();
+        let (size, unit) = humanized_size(inner.proc_vm.as_ref().map_or(0, |vm| vm.memory_usage()));
         write!(
             f,
-            // " #{:-3} | #{:-3} | {:12} | {:7} | {:?} | {:?} | {:?} | {:?}",
-            " #{:-3} | #{:-3} | {:12} | {:7} | {:?} | {:?}",
+            " #{:-3} | #{:-3} | {:12} | {:7} | {:>5.1} {} | {:?}",
             self.pid.0,
             inner.parent().map(|p| p.pid.0).unwrap_or(0),
             inner.name,
             inner.ticks_passed,
-            inner.status,
-            inner.vm().memory_usage(),
-            // inner.data().memory_usage(),
-            // inner.data().code_pages(),
-            // inner.data().code_start(),
+            size,
+            unit,
+            inner.status
         )?;
         Ok(())
     }

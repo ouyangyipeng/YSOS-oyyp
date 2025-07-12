@@ -3,6 +3,7 @@
 
 #[macro_use]
 extern crate log;
+extern crate alloc;
 
 use core::ptr::{copy_nonoverlapping, write_bytes};
 
@@ -10,6 +11,8 @@ use x86_64::structures::paging::page::PageRange;
 use x86_64::structures::paging::{mapper::*, *};
 use x86_64::{align_up, PhysAddr, VirtAddr};
 use xmas_elf::{program, ElfFile};
+use x86_64::structures::paging::page::PageRangeInclusive;
+use alloc::vec::Vec;
 
 /// Map physical memory
 ///
@@ -100,42 +103,56 @@ pub fn load_elf(
     page_table: &mut impl Mapper<Size4KiB>,
     frame_allocator: &mut impl FrameAllocator<Size4KiB>,
     user_access: bool,
-) -> Result<(), MapToError<Size4KiB>> {
+// ) -> Result<(), MapToError<Size4KiB>> {
+) -> Result<Vec<PageRangeInclusive>, MapToError<Size4KiB>> {
     let file_buf = elf.input.as_ptr();
 
     trace!("Loading ELF file... @ {:#x}", file_buf as u64);
 
-    for segment in elf.program_iter() {
-        trace!("Loading segment: {:#x?}", segment);
-        if segment.get_type().unwrap() != program::Type::Load {
-            trace!("Skip segment: {:#x?}", segment);
-            continue;
-        }
+    // for segment in elf.program_iter() {
+    //     trace!("Loading segment: {:#x?}", segment);
+    //     if segment.get_type().unwrap() != program::Type::Load {
+    //         trace!("Skip segment: {:#x?}", segment);
+    //         continue;
+    //     }
 
-        load_segment(
-            file_buf,
-            physical_offset,
-            &segment,
-            page_table,
-            frame_allocator,
-            user_access,
-        )?
-    }
-
-    Ok(())
+    //     load_segment(
+    //         file_buf,
+    //         physical_offset,
+    //         &segment,
+    //         page_table,
+    //         frame_allocator,
+    //         user_access,
+    //     )?
+    // }
+    // Ok(())
+    elf.program_iter()
+        .filter(|segment| segment.get_type().unwrap() == program::Type::Load)
+        .map(|segment| {
+            load_segment(
+                elf,
+                physical_offset,
+                &segment,
+                page_table,
+                frame_allocator,
+                user_access,
+            )
+        })
+        .collect()
 }
 
 /// Load & Map ELF segment
 ///
 /// load segment to new frame and set page table
 fn load_segment(
-    file_buf: *const u8,
+    file_buf: &ElfFile,
     physical_offset: u64,
     segment: &program::ProgramHeader,
     page_table: &mut impl Mapper<Size4KiB>,
     frame_allocator: &mut impl FrameAllocator<Size4KiB>,
     user_access: bool,
-) -> Result<(), MapToError<Size4KiB>> {
+// ) -> Result<(), MapToError<Size4KiB>> {
+) -> Result<PageRangeInclusive, MapToError<Size4KiB>> {
     trace!("Loading & mapping segment: {:#x?}", segment);
 
     let mem_size = segment.mem_size();
@@ -190,7 +207,8 @@ fn load_segment(
     let end_page = Page::containing_address(virt_start_addr + file_size - 1u64);
     let pages = Page::range_inclusive(start_page, end_page);
 
-    let data = unsafe { file_buf.add(file_offset as usize) };
+    // let data = unsafe { file_buf.add(file_offset as usize) };
+    let data = unsafe { file_buf.input.as_ptr().add(file_offset as usize) };
 
     for (idx, page) in pages.enumerate() {
         let frame = frame_allocator
@@ -260,5 +278,7 @@ fn load_segment(
         }
     }
 
-    Ok(())
+    // Ok(())
+    let end_page = Page::containing_address(virt_start_addr + mem_size - 1u64);
+    Ok(Page::range_inclusive(start_page, end_page))
 }
