@@ -281,6 +281,10 @@ impl ProcessManager {
             return false;
         }else{
             let cur_proc = self.current();
+            let cur_pid = cur_proc.pid();
+            if cur_pid == KERNEL_PID {
+                info!("Page fault on kernel at {:#x}", addr);
+            }
             let mut cur_inner = cur_proc.write();
             let vm = cur_inner.vm_mut();
             if vm.handle_page_fault(addr) {
@@ -290,6 +294,15 @@ impl ProcessManager {
                 return false;
             }
         }
+        // let curr_proc = get_process_manager().current();
+        // if !err_code.contains(PageFaultErrorCode::PROTECTION_VIOLATION)
+        //     && !err_code.contains(PageFaultErrorCode::CAUSED_BY_WRITE)
+        // {
+        //     return false;
+        // }
+        // // handle page fault in current process
+        // let ret = curr_proc.write().vm_mut().handle_page_fault(addr);
+        // ret
     }
 
     pub fn kill_self(&self, ret: isize) {

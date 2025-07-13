@@ -9,7 +9,7 @@ extern crate alloc;
 use core::panic;
 
 use alloc::boxed::Box;
-use alloc::vec;
+use alloc::{format, vec::Vec};
 use config::Config;
 use uefi::{entry, Status, mem::memory_map::MemoryMap};
 use x86_64::registers::control::*;
@@ -17,7 +17,7 @@ use ysos_boot::*;
 use xmas_elf::ElfFile;
 use elf::*;
 use x86_64::registers::control::*;
-use x86_64::structures::paging::page::PageRange;
+use x86_64::structures::paging::page::{PageRange, PageRangeInclusive};
 mod config;
 
 const CONFIG_PATH: &str = "\\EFI\\BOOT\\boot.conf";
@@ -82,16 +82,33 @@ fn efi_main() -> Status {
     trace!("Physical memory offset: {:#x}", config.physical_memory_offset);
 
     // FIXME: load and map the kernel elf file
-    match load_elf(&elf, config.physical_memory_offset, &mut page_table, &mut frame_allocator, false){
-        Ok(_) => trace!("Kernel ELF loaded successfully"),
-        Err(e) => panic!("Failed to load ELF file: {:?}", e),
-    }
+    // match load_elf(&elf, config.physical_memory_offset, &mut page_table, &mut frame_allocator, false){
+    //     Ok(_) => trace!("Kernel ELF loaded successfully"),
+    //     Err(e) => panic!("Failed to load ELF file: {:?}", e),
+    // }
+    let code: Vec<PageRangeInclusive> = load_elf(
+        &elf,
+        config.physical_memory_offset,
+        &mut page_table,
+        &mut frame_allocator,
+        false,
+    ).unwrap();
+    trace!("Kernel ELF segments loaded: {:#x?}", code);
+    let kernel_pages: KernelPages = code.into_iter().collect();
 
     // FIXME: map kernel stack
+    // let (stack_start, stack_size) = if config.kernel_stack_auto_grow > 0 {
+    //     let stack_start = config.kernel_stack_address
+    //         + (config.kernel_stack_size - config.kernel_stack_auto_grow) * 0x1000;
+    //     (stack_start, config.kernel_stack_auto_grow)
+    // } else {
+    //     (config.kernel_stack_address, config.kernel_stack_size)
+    // };
     let (stack_start, stack_size) = if config.kernel_stack_auto_grow > 0 {
-        let stack_start = config.kernel_stack_address
-            + (config.kernel_stack_size - config.kernel_stack_auto_grow) * 0x1000;
-        (stack_start, config.kernel_stack_auto_grow)
+        let init_size = config.kernel_stack_auto_grow;
+        let bottom_offset = (config.kernel_stack_size - init_size) * 0x1000;
+        let init_bottom = config.kernel_stack_address + bottom_offset;
+        (init_bottom, init_size)
     } else {
         (config.kernel_stack_address, config.kernel_stack_size)
     };
@@ -151,6 +168,7 @@ fn efi_main() -> Status {
         physical_memory_offset: config.physical_memory_offset,
         system_table,
         loaded_apps: apps,
+        kernel_pages,
     };
 
     // align stack to 8 bytes

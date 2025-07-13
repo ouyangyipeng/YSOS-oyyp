@@ -5,6 +5,10 @@ use x86_64::{
     structures::paging::{mapper::UnmapError, Page},
     VirtAddr,
 };
+// Size4KiB
+use x86_64::structures::paging::Size4KiB;
+use crate::proc::KERNEL_PID;
+use crate::proc::processor;
 
 use super::{FrameAllocatorRef, MapperRef};
 
@@ -53,18 +57,57 @@ impl Heap {
         alloc: FrameAllocatorRef,
     ) -> Option<VirtAddr> {
         // FIXME: if new_end is None, return the current end address
-
+        if new_end.is_none(){
+            return Some(VirtAddr::new(self.end.load(Ordering::Relaxed)));
+        }
         // FIXME: check if the new_end is valid (in range [base, base + HEAP_SIZE])
-
+        let new_end=new_end.unwrap();
+        if new_end.as_u64() < HEAP_START || new_end.as_u64() > HEAP_END {
+            return None;
+        }
         // FIXME: calculate the difference between the current end and the new end
-
+        let user_access = processor::get_pid() != KERNEL_PID;
+        let current_end = self.end.load(Ordering::Relaxed);
+        let diff = new_end.as_u64() as i64 - current_end as i64;
         // NOTE: print the heap difference for debugging
-
+        debug!("Heap difference: {:#x}", diff.abs() as u64);
         // FIXME: do the actual mapping or unmapping
-
+        if diff > 0 {
+            let start:Page<Size4KiB> = Page::containing_address(VirtAddr::new(current_end));
+            let end: Page<Size4KiB> = Page::containing_address(new_end);
+            let count = (end.start_address().as_u64() - start.start_address().as_u64()) / crate::memory::PAGE_SIZE;
+            match elf::map_range(
+                start.start_address().as_u64(),
+                count,
+                mapper,
+                alloc,
+                user_access,
+            ) {
+                Ok(range) => {
+                    debug!(
+                        "map heap ranging from {:#?} to {:#?}",
+                        range.start, range.end
+                    );
+                }
+                Err(e) => {
+                    debug!("Failed to map heap: {:?}", e);
+                    return None;
+                }
+            }
+        } else if diff < 0 {
+            let start: Page<Size4KiB> = Page::containing_address(new_end);
+            let end: Page<Size4KiB> = Page::containing_address(VirtAddr::new(current_end));
+            let page_range = Page::range(start, end);
+            unsafe{
+                if let Err(e) = elf::unmap_range(mapper, alloc, page_range, true){
+                    debug!("Failed to unmap heap: {:?}", e);
+                    return None;
+                }
+            }
+        }
         // FIXME: update the end address
-
-        new_end
+        self.end.store(new_end.as_u64(), Ordering::Relaxed);
+        Some(new_end)
     }
 
     pub(super) fn clean_up(
@@ -77,8 +120,13 @@ impl Heap {
         }
 
         // FIXME: load the current end address and **reset it to base** (use `swap`)
+        let end = self.end.swap(HEAP_START, Ordering::Relaxed);
 
         // FIXME: unmap the heap pages
+        let start_page: Page<Size4KiB> = Page::containing_address(VirtAddr::new(HEAP_START));
+        let end_page: Page<Size4KiB> = Page::containing_address(VirtAddr::new(end));
+        let page_range = Page::range(start_page, end_page);
+        unsafe { elf::unmap_range( mapper, dealloc,page_range, true)?;}
 
         Ok(())
     }

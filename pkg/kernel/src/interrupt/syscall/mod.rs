@@ -67,6 +67,11 @@ pub fn dispatcher(context: &mut ProcessContext) {
             context.set_rax(sys_gettime());
         },
 
+        // None -> brk: usize
+        Syscall::Brk => { /* FIXME: set brk */
+            context.set_rax(sys_brk(&args));
+        },
+
         // None -> pid: u16
         Syscall::GetPid => { /* FIXME: get current pid */ 
             context.set_rax(sys_getpid());

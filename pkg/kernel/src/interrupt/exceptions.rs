@@ -3,6 +3,7 @@ use x86_64::registers::control::Cr2;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 use x86_64::VirtAddr;
 use core::arch::naked_asm;
+use crate::proc;
 
 pub unsafe fn register_idt(idt: &mut InterruptDescriptorTable) {
     unsafe{
@@ -128,6 +129,21 @@ pub extern "x86-interrupt" fn page_fault_handler(
         );
         panic!("Cannot handle page fault!");
     }
+    
+    // if !crate::proc::handle_page_fault(
+    //     Cr2::read().unwrap_or(VirtAddr::new_truncate(0xdeadbeef)),
+    //     err_code,
+    // ) {
+    //     warn!(
+    //         "EXCEPTION: PAGE FAULT, ERROR_CODE: {:?}\n\nTrying to access: {:#x}\n{:#?}",
+    //         err_code,
+    //         Cr2::read().unwrap_or(VirtAddr::new_truncate(0xdeadbeef)),
+    //         stack_frame
+    //     );
+    //     // FIXME: print info about which process causes page fault?
+
+    //     info!("Page fault occurred for process: {:?}", proc::manager::get_process_manager().current().pid());
+    // }
 }
 
 

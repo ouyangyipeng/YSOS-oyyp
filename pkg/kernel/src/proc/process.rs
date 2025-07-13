@@ -247,6 +247,8 @@ impl ProcessInner {
         // self.clean_stack(pid);
         self.proc_vm.take();
         self.proc_data.take();
+        // consume the Option<ProcessVm> and drop it
+        self.proc_vm.take();
     }
 
     // fn clean_stack(&mut self, pid: ProcessId) {
@@ -382,6 +384,10 @@ impl ProcessInner {
 
     pub fn open_file(&mut self, path: &str) -> u8 {
         self.proc_data.as_mut().unwrap().open_file(path)
+    }
+    
+    pub fn brk(&self,addr: Option<VirtAddr>) -> Option<VirtAddr>{
+        self.proc_vm.as_ref().unwrap().brk(addr)
     }
 }
 

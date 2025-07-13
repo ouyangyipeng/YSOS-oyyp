@@ -42,7 +42,7 @@ pub enum ProgramStatus {
 /// init process manager
 pub fn init(boot_info: &'static boot::BootInfo) {
     /* 将内核包装成进程，并将其传递给 ProcessManager，使其成为第一个进程 */
-    let proc_vm = ProcessVm::new(PageTableContext::new()).init_kernel_vm();
+    let proc_vm = ProcessVm::new(PageTableContext::new()).init_kernel_vm(&boot_info.kernel_pages);
 
     trace!("Init kernel vm: {:#?}", proc_vm);
 
@@ -94,6 +94,7 @@ pub fn init(boot_info: &'static boot::BootInfo) {
         Some(proc_vm),
         Some(kproc_data),
     );
+    // kproc.write().resume();
     let app_list = boot_info.loaded_apps.as_ref();
     manager::init(kproc, app_list);
     manager::get_process_manager().print_process_list();
@@ -410,4 +411,11 @@ pub fn open_file(path: &str) -> u8 {
 
 pub fn close_file(fd: u8) -> bool {
     x86_64::instructions::interrupts::without_interrupts(|| get_process_manager().close_file(fd))
+}
+
+pub fn brk(addr: Option<VirtAddr>) -> Option<VirtAddr> {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // NOTE: `brk` does not need to get write lock
+        get_process_manager().current().read().brk(addr)
+    })
 }

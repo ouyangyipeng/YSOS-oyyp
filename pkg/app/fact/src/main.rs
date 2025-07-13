@@ -17,6 +17,7 @@ fn factorial(n: u64) -> u64 {
 
 fn main() -> isize {
     lib::init();
+    println!("brk allocator initialized");
     // prase input as u64
     let n = 1000000;
 
@@ -34,7 +35,7 @@ fn main() -> isize {
     // print result
     println!("The factorial of {} under modulo {} is {}.", n, MOD, result);
 
-    sys_wait_pid(1);
+    // sys_wait_pid(1);
     0
 }
 

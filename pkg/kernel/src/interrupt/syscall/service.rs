@@ -5,6 +5,8 @@ use crate::proc::*;
 use crate::utils;
 use crate::utils::*;
 use crate::filesystem;
+// Virtual address
+use x86_64::VirtAddr;
 
 use super::SyscallArgs;
 
@@ -54,6 +56,18 @@ pub fn sys_gettime() -> usize {
     let time = current_datetime().and_utc().timestamp_nanos_opt().unwrap_or(0);
     // let ret = utils::time_to_unix(&time);
     time as usize
+}
+
+pub fn sys_brk(args: &SyscallArgs) -> usize {
+    let new_heap_end = if args.arg0 == 0 {
+        None
+    } else {
+        Some(VirtAddr::new(args.arg0 as u64))
+    };
+    match brk(new_heap_end) {
+        Some(new_heap_end) => new_heap_end.as_u64() as usize,
+        None => !0,
+    }
 }
 
 pub fn sys_getpid() -> usize {

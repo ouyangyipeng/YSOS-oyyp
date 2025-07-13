@@ -105,6 +105,15 @@ pub fn sys_get_time() -> usize {
 }
 
 #[inline(always)]
+pub fn sys_brk(addr: Option<usize>) -> Option<usize> {
+    const BRK_FAILED: usize = !0;
+    match syscall!(Syscall::Brk, addr.unwrap_or(0)) {
+        BRK_FAILED => None,
+        ret => Some(ret),
+    }
+}
+
+#[inline(always)]
 pub fn sys_fork() -> u16 {
     syscall!(Syscall::Fork) as u16
 }

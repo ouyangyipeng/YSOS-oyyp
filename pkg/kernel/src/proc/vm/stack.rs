@@ -6,6 +6,9 @@ use crate::proc::*;
 
 use super::{FrameAllocatorRef, MapperRef};
 use core::ptr::copy_nonoverlapping;
+use x86_64::structures::paging::mapper::UnmapError;
+// PhysFrame is defined in `x86_64::structures::paging::frame::PhysFrame`
+use x86_64::structures::paging::frame::PhysFrame;
 
 
 
@@ -30,7 +33,8 @@ const STACK_INIT_TOP_PAGE: Page<Size4KiB> = Page::containing_address(VirtAddr::n
 // kernel stack
 pub const KSTACK_MAX: u64 = 0xffff_ff02_0000_0000;
 pub const KSTACK_DEF_BOT: u64 = KSTACK_MAX - STACK_MAX_SIZE;
-pub const KSTACK_DEF_PAGE: u64 = 512;
+// pub const KSTACK_DEF_PAGE: u64 = 512;
+pub const KSTACK_DEF_PAGE: u64 = 8;
 pub const KSTACK_DEF_SIZE: u64 = KSTACK_DEF_PAGE * crate::memory::PAGE_SIZE;
 
 pub const KSTACK_INIT_BOT: u64 = KSTACK_MAX - KSTACK_DEF_SIZE;
@@ -80,14 +84,27 @@ impl Stack {
         mapper: MapperRef,          // 映射器
         alloc: FrameAllocatorRef,   // 帧分配器
     ) -> bool {
+        // info!("Handling page fault for stack at address: {:#x}", addr);
         if !self.is_on_stack(addr) {
             return false;
         }
+        // info!("Page fault on stack at address: {:#x}", addr);
 
         if let Err(m) = self.grow_stack(addr, mapper, alloc) {
             error!("Grow stack failed: {:?}", m);
             return false;
         }
+        // info!("Stack grown successfully: {:#x} -> {:#x}", 
+        //     self.range.start.start_address().as_u64(), 
+        //     self.range.end.start_address().as_u64()
+        // );
+        if !self.is_on_stack(addr) {
+            return false;
+        }
+        // info!("Stack grown successfully: {:#x} -> {:#x}", 
+        //     self.range.start.start_address().as_u64(), 
+        //     self.range.end.start_address().as_u64()
+        // );
 
         true
     }
@@ -107,49 +124,83 @@ impl Stack {
         alloc: FrameAllocatorRef,
     ) -> Result<(), MapToError<Size4KiB>> {
         debug_assert!(self.is_on_stack(addr), "Address is not on stack.");
+        // info!("Growing stack for address: {:#x}", addr);
 
         // FIXME: grow stack for page fault
-        let new_start = Page::<Size4KiB>::containing_address(addr);
-        let pre_start = self.range.start;
-        let pre_end = self.range.end;
-        let new_count = pre_start - new_start;// 不太确定，要不要+1？
-        let new_range = Page::range(new_start, pre_end);
-        let new_usage = pre_end - pre_start;
-        let is_user_access = processor::get_pid() != KERNEL_PID;
+        // let new_start = Page::<Size4KiB>::containing_address(addr);
+        // let pre_start = self.range.start;
+        // let pre_end = self.range.end;
+        // info!("flag0");
+        // if new_start <= pre_start {
+        //     warn!("Stack already at the bottom, cannot grow.");
+        //     // PageAlreadyMapped(PhysFrame<S>)
+        // }
+        // let new_count = pre_start - new_start+1;// 不太确定，要不要+1？
+        // info!("flag1");
+        // let new_range = Page::range(new_start, pre_end);
+        // let new_usage = pre_end - pre_start;
+        // info!("flag2");
+        // let is_user_access = processor::get_pid() != KERNEL_PID;
+        // info!("Growing stack from {:#x} to {:#x}, usage: {} pages",
+        //     new_start.start_address().as_u64(),
+        //     pre_end.start_address().as_u64(),
+        //     new_usage
+        // );
         
-        match elf::map_range(
-            new_start.start_address().as_u64(),
-            new_count,
+        // match elf::map_range(
+        //     new_start.start_address().as_u64(),
+        //     new_count,
+        //     mapper,
+        //     alloc,
+        //     is_user_access,
+        //     // false,
+        // ) {
+        //     Ok(range) => {
+        //         // info!("Stack range: {:#?}", range);
+        //         self.range = new_range;
+        //         self.usage += new_usage;
+        //     }
+        //     Err(e) => {
+        //         error!("Failed to map stack: {:#?}", e);
+        //         return Err(e);
+        //     }
+        // }
+
+        // self.usage = new_usage;
+        // self.range = new_range;
+
+        // trace!(
+        //     "Stack range: {:#x} -> {:#x}",
+        //     self.range.start.start_address().as_u64(),
+        //     self.range.end.start_address().as_u64()
+        // );
+        // trace!(
+        //     "Stack usage: {:#x} -> {:#x}",
+        //     self.range.start.start_address().as_u64(),
+        //     self.usage
+        // );
+
+        // Ok(())
+        
+        let addr_at_page = Page::<Size4KiB>::containing_address(addr);
+        let start_page = self.range.start;
+        // info!("flag0");
+        let alloc_page_nums = start_page - addr_at_page;
+        // info!("flag1");
+        let original_page_size = self.range.end - start_page;
+        // info!("flag2");
+
+        let is_user_access = processor::get_pid() != KERNEL_PID;
+        elf::map_range(
+            addr_at_page.start_address().as_u64(),
+            alloc_page_nums,
             mapper,
             alloc,
             is_user_access,
-            // false,
-        ) {
-            Ok(range) => {
-                // info!("Stack range: {:#?}", range);
-                self.range = new_range;
-                self.usage += new_usage;
-            }
-            Err(e) => {
-                error!("Failed to map stack: {:#?}", e);
-                return Err(e);
-            }
-        }
+        )?;
 
-        self.usage = new_usage;
-        self.range = new_range;
-
-        trace!(
-            "Stack range: {:#x} -> {:#x}",
-            self.range.start.start_address().as_u64(),
-            self.range.end.start_address().as_u64()
-        );
-        trace!(
-            "Stack usage: {:#x} -> {:#x}",
-            self.range.start.start_address().as_u64(),
-            self.usage
-        );
-
+        self.usage = original_page_size + alloc_page_nums;
+        self.range = Page::range(addr_at_page, addr_at_page + self.usage);
         Ok(())
     }
 
@@ -229,6 +280,59 @@ impl Stack {
                 (size * Size4KiB::SIZE / 8) as usize,
             );
         }
+    }
+
+    pub fn clean_up(
+        &mut self,
+        // following types are defined in
+        //   `pkg/kernel/src/proc/vm/mod.rs`
+        mapper: MapperRef,
+        dealloc: FrameAllocatorRef,
+    ) -> Result<(), UnmapError> {
+        if self.usage == 0 {
+            warn!("Stack is empty, no need to clean up.");
+            return Ok(());
+        }
+
+        // FIXME: unmap stack pages with `elf::unmap_pages`
+        let start_addr = self.range.start.start_address().as_u64();
+        let range_start = Page::containing_address(VirtAddr::new(start_addr));
+        let range_end = range_start + self.usage;
+        let page_range = Page::range(range_start, range_end);
+        match processor::get_pid() {
+            KERNEL_PID => {
+                // kernel stack
+                unsafe{
+                    elf::unmap_range(
+                        // &mut mapper.lock(),
+                        // &mut dealloc.lock(),
+                        mapper,
+                        dealloc,
+                        // self.range.clone(),
+                        page_range,
+                        false,
+                    )?;
+                }
+            }
+            _ => {
+                // user stack
+                unsafe {
+                    elf::unmap_range(
+                        // &mut mapper.lock(),
+                        // &mut dealloc.lock(),
+                        mapper,
+                        dealloc,                        
+                        // self.range.clone(),
+                        page_range,
+                        true,
+                    )?;
+                }
+            }
+        }
+
+        self.usage = 0;
+
+        Ok(())
     }
 }
 
